@@ -172,6 +172,10 @@ jobs:
         sed -i '\#MODULES_ORDER=android/gki_aarch64_modules#d' ./$B_CONFIG
         sed -i '/KMI_SYMBOL_LIST_STRICT_MODE/d' ./$B_CONFIG
 
+        # *********************************************************************************
+        if [ '${{ inputs.MANIFEST_selection }}' == 'EvoX' ]; then sed -i 's/SUBLEVEL =.*/SUBLEVEL = 236/' ./Makefile; fi
+        # *********************************************************************************
+
         echo "Start compiling..."
         # Ensure that the environment variables contain CCACHE_DIR
         export CCACHE_DIR=$HOME/.ccache
