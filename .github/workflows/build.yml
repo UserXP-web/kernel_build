@@ -4,6 +4,10 @@ name: Kernel Builder
 #pragma GCC diagnostic ignored "-Wunused-label"
 #[-Werror,-Wunused-label]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
   actions: write
