@@ -226,7 +226,7 @@ jobs:
     - name: Upload product
       uses: actions/upload-artifact@v4
       with:
-        name: kernel-${{ inputs.KERNEL_IMAGE_NAME }}
+        name: Garnet-kernel_${{ inputs.MANIFEST_selection }}
         path: |
           ${{ env.ZIP_PATH }}
           *.img
