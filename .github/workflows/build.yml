@@ -9,21 +9,15 @@ permissions:
   actions: write
 
 env:
+  manifest_url: https://github.com/UserXP-web/kernel_build/manifest
+  manifest_branch: main
   sm_type: sm7435
+  ZIP_PATH: 
   
 on:
   workflow_dispatch:
     inputs:
-      MANIFEST_URL:
-        description: 'Kernel Manifest'
-        required: true
-        default: 'https://github.com/UserXP-web/android_kernel_xiaomi_sm7435'
-      MANIFEST_BRANCH:
-        description: 'Kernel Manifest Branch'
-        required: true
-        default: 'lineage-23.2'
-
-      BUILD_CONFIG_selection:
+      MANIFEST_selection:
         # .../sm7435/< Customized build.config file >
         description: "Select github source for kernel"
         required: true
@@ -32,7 +26,7 @@ on:
           - "userxp"
           - "playground"
         default: "playground"
-      BUILD_CONFIG_config:
+      BUILD_CONFIG_file:
         description: 'Customized build.config file'
         required: true
         default: 'build.config.gki.aarch64'
@@ -149,6 +143,7 @@ jobs:
     # Initial the kernel manifest then sync after
     - name: Initialize Manifest and Sync
       run: |
+        MANIFEST_URL=${{ env.manifest_url }}/${{ inputs.MANIFEST_selection }}
         mkdir -p android
         cd android
         #######################################################
@@ -156,18 +151,18 @@ jobs:
         #######################################################
         git config --global user.name "${{ github.actor }}"
         git config --global user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
-        repo init --depth=1 -u ${{ inputs.MANIFEST_URL }} -b ${{ inputs.MANIFEST_BRANCH }}
+        repo init --depth=1 -u $MANIFEST_URL -b ${{ env.manifest_branch }}
         repo sync
 
     - name: CORRECT stupid
       run: |
-        SUB_DIR=${{ inputs.BUILD_CONFIG_selection }}/${{ env.sm_type }}
+        SUB_DIR=${{ env.sm_type }}
         curl -LSs "https://raw.githubusercontent.com/UserXP-web/Action-Kernel-Builder-AOSP/refs/heads/main/correct/bootconfig.c" -o ./android/$SUB_DIR/fs/proc/bootconfig.c
         
     # Starts the compiling process of android kernel
     - name: Build Kernel
       run: |
-        B_CONFIG=${{ inputs.BUILD_CONFIG_selection }}/${{ env.sm_type }}/${{ inputs.BUILD_CONFIG_config }}
+        B_CONFIG=${{ env.sm_type }}/${{ inputs.BUILD_CONFIG_file }}
         cd android
         sed -i 's/BUILD_SYSTEM_DLKM=1/BUILD_SYSTEM_DLKM=0/' ./$B_CONFIG
         sed -i '\#MODULES_ORDER=android/gki_aarch64_modules#d' ./$B_CONFIG
