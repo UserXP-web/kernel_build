@@ -78,7 +78,7 @@ jobs:
       run: |
         MANIFEST_URL=${{ env.manifest_url }}
         MANIFEST_BRANCH=${{ env.manifest_branch }}
-        MMM=maniifest/userxp/default.xml  # ${{ inputs.MANIFEST_URL_selection }}
+        MMM=manifest/userxp/default.xml  # ${{ inputs.MANIFEST_URL_selection }}
         echo "~ $MANIFEST_URL ^^^ $MANIFEST_BRANCH"
         mkdir -p android
         cd android
