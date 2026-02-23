@@ -166,14 +166,18 @@ jobs:
     # Starts the compiling process of android kernel
     - name: Build Kernel
       run: |
-        B_CONFIG=${{ env.manifest_folder }}/${{ inputs.BUILD_CONFIG_file }}
         cd android
+        ROOT=${{ env.manifest_folder }}
+        B_CONFIG=$ROOT/${{ inputs.BUILD_CONFIG_file }}        
         sed -i 's/BUILD_SYSTEM_DLKM=1/BUILD_SYSTEM_DLKM=0/' ./$B_CONFIG
         sed -i '\#MODULES_ORDER=android/gki_aarch64_modules#d' ./$B_CONFIG
         sed -i '/KMI_SYMBOL_LIST_STRICT_MODE/d' ./$B_CONFIG
 
         # *********************************************************************************
-        if [ '${{ inputs.MANIFEST_selection }}' == 'EvoX' ]; then sed -i 's/SUBLEVEL =.*/SUBLEVEL = 236/' ./Makefile; fi
+        if [ '${{ inputs.MANIFEST_selection }}' == 'EvoX' ]; then 
+          sed -i 's/SUBLEVEL =.*/SUBLEVEL = 236/' ./$ROOT/Makefile;
+        fi
+        cat ./$ROOT/Makefile;
         # *********************************************************************************
 
         echo "Start compiling..."
