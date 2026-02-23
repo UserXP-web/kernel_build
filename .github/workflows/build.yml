@@ -17,7 +17,7 @@ env:
 on:
   workflow_dispatch:
     inputs:
-      MANIFEST_URL_selection:
+      MANIFEST_selection:
         # .../sm7435/< Customized build.config file >
         description: "Select github source for kernel"
         required: true
@@ -58,39 +58,6 @@ jobs:
       uses: pierotofy/set-swap-space@master
       with:
         swap-size-gb: 32
-
-
-    - name: Install Repo Tool
-      if: true
-      run: |
-        if ! command -v repo &> /dev/null; then
-            echo "Installing 'repo'..."
-            mkdir -p ~/bin  # Create bin directory if it doesn't exist
-            curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
-            chmod a+x ~/bin/repo
-            sudo ln -sf ~/bin/repo /usr/bin/repo
-            echo "...installed!"
-        else
-            echo "'repo' command exist."
-        fi
-
-    - name: Initialize Manifest and Sync
-      run: |
-        MANIFEST_URL=${{ env.manifest_url }}
-        MANIFEST_BRANCH=${{ env.manifest_branch }}
-        MMM=manifest/userxp/default.xml  # ${{ inputs.MANIFEST_URL_selection }}
-        echo "~ $MANIFEST_URL ^^^ $MANIFEST_BRANCH"
-        mkdir -p android
-        cd android
-        #######################################################
-        git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-6.4.1.git gcc
-        #######################################################
-        git config --global user.name "${{ github.actor }}"
-        git config --global user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
-        repo init --depth=1 -u $MANIFEST_URL -b $MANIFEST_BRANCH -m $MMM
-        repo sync
-    
-
     
     - name: recover Ccache
       if: true
@@ -126,7 +93,19 @@ jobs:
         ccache -z
 
     # Install repo tool
-
+    - name: Install Repo Tool
+      if: true
+      run: |
+        if ! command -v repo &> /dev/null; then
+            echo "Installing 'repo'..."
+            mkdir -p ~/bin  # Create bin directory if it doesn't exist
+            curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+            chmod a+x ~/bin/repo
+            sudo ln -sf ~/bin/repo /usr/bin/repo
+            echo "...installed!"
+        else
+            echo "'repo' command exist."
+        fi
 
     - name: Download toolchain
       run: |
@@ -161,8 +140,21 @@ jobs:
 
         git clone https://github.com/WildPlusKernel/AnyKernel3.git -b "gki-2.0"
 
-
-
+    - name: Initialize Manifest and Sync
+      run: |
+        MANIFEST_URL=${{ env.manifest_url }}
+        MANIFEST_BRANCH=${{ env.manifest_branch }}
+        MANIFEST_XML=manifest/${{ inputs.MANIFEST_selection }}.xml
+        echo "~ $MANIFEST_URL ^^^ $MANIFEST_BRANCH"
+        mkdir -p android
+        cd android
+        #######################################################
+        git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-6.4.1.git gcc
+        #######################################################
+        git config --global user.name "${{ github.actor }}"
+        git config --global user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+        repo init --depth=1 -u $MANIFEST_URL -b $MANIFEST_BRANCH -m $MANIFEST_XML
+        repo sync
 
     - name: CORRECT stupid
       run: |
