@@ -145,7 +145,8 @@ jobs:
         MANIFEST_URL=${{ env.manifest_url }}
         MANIFEST_BRANCH=${{ env.manifest_branch }}
         MANIFEST_XML=manifest/${{ inputs.MANIFEST_selection }}.xml
-        echo "~ $MANIFEST_URL ^^^ $MANIFEST_BRANCH"
+        echo "~ $MANIFEST_URL ^^^ $MANIFEST_BRANCH" --- $MANIFEST_XML
+        
         mkdir -p android
         cd android
         #######################################################
