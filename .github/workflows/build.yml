@@ -11,7 +11,7 @@ permissions:
 env:
   manifest_url: 'https://github.com/UserXP-web/kernel_build'
   manifest_branch: 'main'
-  sm_type: 'common' # sm7435
+  manifest_folder: 'common' # sm7435
   ZIP_PATH: ''
   
 on:
@@ -160,13 +160,13 @@ jobs:
 
     - name: CORRECT stupid
       run: |
-        SUB_DIR=${{ env.sm_type }}
+        SUB_DIR=${{ env.manifest_folder }}
         curl -LSs "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/correct/bootconfig.c" -o ./android/$SUB_DIR/fs/proc/bootconfig.c
         
     # Starts the compiling process of android kernel
     - name: Build Kernel
       run: |
-        B_CONFIG=${{ env.sm_type }}/${{ inputs.BUILD_CONFIG_file }}
+        B_CONFIG=${{ env.manifest_folder }}/${{ inputs.BUILD_CONFIG_file }}
         cd android
         sed -i 's/BUILD_SYSTEM_DLKM=1/BUILD_SYSTEM_DLKM=0/' ./$B_CONFIG
         sed -i '\#MODULES_ORDER=android/gki_aarch64_modules#d' ./$B_CONFIG
