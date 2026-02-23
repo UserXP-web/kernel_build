@@ -76,6 +76,24 @@ jobs:
       run: |
         sudo apt update
         sudo apt install -y ccache python3 git curl build-essential libssl-dev bison flex rsync libelf-dev dwarves clang libc++-dev libc++abi-dev device-tree-compiler bc
+
+
+
+    # Initial the kernel manifest then sync after
+    - name: Initialize Manifest and Sync
+      run: |
+        MANIFEST_URL=https://github.com/UserXP-web/kernel_build/manifest/userxp
+        MANIFEST_BRANCH=main
+        mkdir -p android
+        cd android
+        #######################################################
+        git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-6.4.1.git gcc
+        #######################################################
+        git config --global user.name "${{ github.actor }}"
+        git config --global user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+        repo init --depth=1 -u $MANIFEST_URL -b $MANIFEST_BRANCH
+        repo sync
+
         
     - name: Configuration Ccache
       if: true
@@ -140,21 +158,9 @@ jobs:
 
         git clone https://github.com/WildPlusKernel/AnyKernel3.git -b "gki-2.0"
 
-    # Initial the kernel manifest then sync after
-    - name: Initialize Manifest and Sync
-      run: |
-        MANIFEST_URL=${{ env.manifest_url }}
-        MANIFEST_BRANCH=${{ env.manifest_branch }}/${{ inputs.MANIFEST_selection }}
-        mkdir -p android
-        cd android
-        #######################################################
-        git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-6.4.1.git gcc
-        #######################################################
-        git config --global user.name "${{ github.actor }}"
-        git config --global user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
-        repo init --depth=1 -u $MANIFEST_URL -b $MANIFEST_BRANCH
-        repo sync
 
+    
+    
     - name: CORRECT stupid
       run: |
         SUB_DIR=${{ env.sm_type }}
