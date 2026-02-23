@@ -9,10 +9,10 @@ permissions:
   actions: write
 
 env:
-  manifest_url: https://github.com/UserXP-web/kernel_build
-  manifest_branch: main
-  sm_type: sm7435
-  ZIP_PATH: 
+  manifest_url: 'https://github.com/UserXP-web/kernel_build'
+  manifest_branch: 'main'
+  sm_type: 'common' # sm7435
+  ZIP_PATH: ''
   
 on:
   workflow_dispatch:
@@ -191,7 +191,7 @@ jobs:
       run: |
         cd AnyKernel3
         cp ../android/out/android12-5.10/dist/Image ./
-        ZIP_NAME="garnet-android12-5.10-236.zip"
+        ZIP_NAME="garnet-${{ inputs.MANIFEST_selection }}_android12-5.10-236.zip"
         zip -r "$ZIP_NAME" ./*
         echo "ZIP_PATH=$GITHUB_WORKSPACE/AnyKernel3/$ZIP_NAME" >> $GITHUB_ENV
 
