@@ -1,0 +1,232 @@
+name: Kernel Builder
+
+#pragma clang diagnostic ignored "-Wunused-label"
+#pragma GCC diagnostic ignored "-Wunused-label"
+#[-Werror,-Wunused-label]
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  sm_type: sm7435
+  
+on:
+  workflow_dispatch:
+    inputs:
+      MANIFEST_URL:
+        description: 'Kernel Manifest'
+        required: true
+        default: 'https://github.com/UserXP-web/android_kernel_xiaomi_sm7435'
+      MANIFEST_BRANCH:
+        description: 'Kernel Manifest Branch'
+        required: true
+        default: 'lineage-23.2'
+
+      BUILD_CONFIG_selection:
+        # .../sm7435/< Customized build.config file >
+        description: "Select github source for kernel"
+        required: true
+        type: choice
+        options:
+          - "userxp"
+          - "playground"
+        default: "playground"
+      BUILD_CONFIG_config:
+        description: 'Customized build.config file'
+        required: true
+        default: 'build.config.gki.aarch64'
+        
+      KERNEL_IMAGE_NAME:
+        description: 'Image, Image.gz, Image.gz-dtb, etc.'
+        required: true
+        default: 'Image'
+      ANYKERNEL3:
+        description: 'Make flashable AnyKernel3 zip'
+        type: boolean
+        required: true
+        default: false
+
+jobs:
+  build:
+    name: Kernel Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:    
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    #- name: Cleanup
+    #  uses: rokibhasansagar/slimhub_actions@main
+      
+    - name: Set Swap Space
+      uses: pierotofy/set-swap-space@master
+      with:
+        swap-size-gb: 32
+    
+    - name: recover Ccache
+      if: true
+      uses: actions/cache@v4
+      with:
+        path: ~/.ccache
+        #key: ccache-gki-${{ env.SUB_LEVEL }}-${{ github.run_id }}
+        key: ccache-gki-236-${{ github.run_id }}
+        restore-keys: |
+          ccache-gki-236-
+        #restore-keys: |
+        #  ccache-gki-${{ env.SUB_LEVEL }}-
+        #  ccache-gki-
+
+    - name: Build Environment
+      run: |
+        sudo apt update
+        sudo apt install -y ccache python3 git curl build-essential libssl-dev bison flex rsync libelf-dev dwarves clang libc++-dev libc++abi-dev device-tree-compiler bc
+        
+    - name: Configuration Ccache
+      if: true
+      run: |
+        mkdir -p ~/.ccache
+        echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
+
+        # Set maximum cache 10G
+        ccache -M 10G
+        ccache --set-config=sloppiness=time_macros,file_macro,include_file_ctime,include_file_mtime
+        ccache --set-config=compiler_check=content
+        ccache --set-config=compression=true
+
+        # Clear statistical data
+        ccache -z
+
+    # Install repo tool
+    - name: Install Repo Tool
+      if: true
+      run: |
+        if ! command -v repo &> /dev/null; then
+            echo "Installing 'repo'..."
+            mkdir -p ~/bin  # Create bin directory if it doesn't exist
+            curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+            chmod a+x ~/bin/repo
+            sudo ln -sf ~/bin/repo /usr/bin/repo
+            echo "...installed!"
+        else
+            echo "'repo' command exist."
+        fi
+
+    - name: Download toolchain
+      run: |
+        #mkdir -p ./git-repo
+        #curl https://storage.googleapis.com/git-repo-downloads/repo > ./git-repo/repo
+        #chmod a+rx ./git-repo/repo
+        #echo "REPO=$GITHUB_WORKSPACE/git-repo/repo" >> $GITHUB_ENV
+
+        AOSP_MIRROR=https://android.googlesource.com
+        BRANCH=main-kernel-build-2024
+        git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools
+        git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 mkbootimg
+
+        echo "MKBOOTIMG=$GITHUB_WORKSPACE/mkbootimg/mkbootimg.py" >> $GITHUB_ENV
+        echo "UNPACK_BOOTIMG=$GITHUB_WORKSPACE/mkbootimg/unpack_bootimg.py" >> $GITHUB_ENV
+        echo "AVBTOOL=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/avbtool" >> $GITHUB_ENV
+
+        openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 > ./kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem
+        echo "BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> $GITHUB_ENV
+
+
+        echo "Cloning the llvm-Clang22 toolchain..." &&
+        #cd android
+        mkdir -p clang22 &&
+        aria2c -s16 -x16 -k1M https://github.com/bachnxuan/aosp_clang_mirror/releases/download/clang-r584948b-14726520/clang-r584948b.tar.gz -o clang.zip &&
+        tar -xf clang.zip -C clang22 &&
+        rm -rf clang.zip
+
+        WORKDIR="$(pwd)"
+        export PATH="$WORKDIR/clang22/bin:$PATH"
+        echo "PATH=$PATH"
+
+        git clone https://github.com/WildPlusKernel/AnyKernel3.git -b "gki-2.0"
+
+    # Initial the kernel manifest then sync after
+    - name: Initialize Manifest and Sync
+      run: |
+        mkdir -p android
+        cd android
+        #######################################################
+        git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-6.4.1.git gcc
+        #######################################################
+        git config --global user.name "${{ github.actor }}"
+        git config --global user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+        repo init --depth=1 -u ${{ inputs.MANIFEST_URL }} -b ${{ inputs.MANIFEST_BRANCH }}
+        repo sync
+
+    - name: CORRECT stupid
+      run: |
+        SUB_DIR=${{ inputs.BUILD_CONFIG_selection }}/${{ env.sm_type }}
+        curl -LSs "https://raw.githubusercontent.com/UserXP-web/Action-Kernel-Builder-AOSP/refs/heads/main/correct/bootconfig.c" -o ./android/$SUB_DIR/fs/proc/bootconfig.c
+        
+    # Starts the compiling process of android kernel
+    - name: Build Kernel
+      run: |
+        B_CONFIG=${{ inputs.BUILD_CONFIG_selection }}/${{ env.sm_type }}/${{ inputs.BUILD_CONFIG_config }}
+        cd android
+        sed -i 's/BUILD_SYSTEM_DLKM=1/BUILD_SYSTEM_DLKM=0/' ./$B_CONFIG
+        sed -i '\#MODULES_ORDER=android/gki_aarch64_modules#d' ./$B_CONFIG
+        sed -i '/KMI_SYMBOL_LIST_STRICT_MODE/d' ./$B_CONFIG
+
+        echo "Start compiling..."
+        # Ensure that the environment variables contain CCACHE_DIR
+        export CCACHE_DIR=$HOME/.ccache
+        export CCACHE_EXEC=/usr/bin/ccache
+        echo "KBUILD_BUILD_TIMESTAMP=${KBUILD_BUILD_TIMESTAMP:-<empty>}"
+        echo "LOCALVERSION=${LOCALVERSION:-<empty>}"
+        
+        #BUILD_CONFIG="$B_CONFIG" build/build.sh # 2>&1 | tee build.log
+        #LTO=thin BUILD_CONFIG="$B_CONFIG" build/build.sh # 2>&1 | tee build.log
+        LTO=thin BUILD_CONFIG=$B_CONFIG build/build.sh CC="/usr/bin/ccache clang"
+
+        echo "Ccache statistics:"
+        ccache -s
+        
+    - name: Setup kernel
+      continue-on-error: true
+      run: |
+        cd AnyKernel3
+        cp ../android/out/android12-5.10/dist/Image ./
+        ZIP_NAME="garnet-android12-5.10-236.zip"
+        zip -r "$ZIP_NAME" ./*
+        echo "ZIP_PATH=$GITHUB_WORKSPACE/AnyKernel3/$ZIP_NAME" >> $GITHUB_ENV
+
+    - name: Boot.img
+      if: true
+      run: |
+        cd "android/out/android12-5.10/dist"
+        mkdir bootimgs && cd bootimgs
+        cp ../Image ./
+        
+        GKI_URL="https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-2025-05_r7.zip"
+        
+        echo "Download the official Boot: $GKI_URL"
+        if curl --output /dev/null --silent --head --fail "$GKI_URL"; then
+           curl -Lo gki.zip "$GKI_URL"
+        else
+           echo "Error: The boot image for this version cannot be found on Google's servers. Trying to use Fallback (2023-01)..."
+           curl -Lo gki.zip "https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-2023-01_r1.zip"
+        fi
+        
+        unzip gki.zip && rm gki.zip
+        $UNPACK_BOOTIMG --boot_img=boot-5.10.img
+        
+        gzip -n -k -f -9 ./Image > ./Image.gz
+        
+        $MKBOOTIMG --header_version 4 --kernel Image.gz --output boot-new.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level 2025-05
+        $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-new.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
+        
+        mv boot-new.img $GITHUB_WORKSPACE/boot.img
+        
+    - name: Upload product
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-${{ inputs.KERNEL_IMAGE_NAME }}.zip
+        path: |
+          ${{ env.ZIP_PATH }}
+          *.img
