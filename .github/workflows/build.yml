@@ -181,7 +181,6 @@ jobs:
         if [ '${{ inputs.MANIFEST_selection }}' == 'EvoX' ]; then 
           sed -i 's/SUBLEVEL =.*/SUBLEVEL = 236/' ./$ROOT/Makefile;
         fi
-        cat ./$ROOT/Makefile;
         # *********************************************************************************
 
         echo "Start compiling..."
