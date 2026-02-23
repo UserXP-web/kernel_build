@@ -219,11 +219,12 @@ jobs:
         $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-new.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
         
         mv boot-new.img $GITHUB_WORKSPACE/boot.img
+        mv boot-5.10.img $GITHUB_WORKSPACE/boot-5.10.img
         
     - name: Upload product
       uses: actions/upload-artifact@v4
       with:
-        name: kernel-${{ inputs.KERNEL_IMAGE_NAME }}.zip
+        name: kernel-${{ inputs.KERNEL_IMAGE_NAME }}
         path: |
           ${{ env.ZIP_PATH }}
           *.img
