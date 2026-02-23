@@ -25,6 +25,7 @@ on:
         options:
           - "userxp"
           - "playground"
+          - "evox"
         default: "playground"
       BUILD_CONFIG_file:
         description: 'Customized build.config file'
@@ -160,7 +161,7 @@ jobs:
     - name: CORRECT stupid
       run: |
         SUB_DIR=${{ env.sm_type }}
-        curl -LSs "https://raw.githubusercontent.com/UserXP-web/Action-Kernel-Builder-AOSP/refs/heads/main/correct/bootconfig.c" -o ./android/$SUB_DIR/fs/proc/bootconfig.c
+        curl -LSs "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/correct/bootconfig.c" -o ./android/$SUB_DIR/fs/proc/bootconfig.c
         
     # Starts the compiling process of android kernel
     - name: Build Kernel
