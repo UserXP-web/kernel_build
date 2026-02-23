@@ -23,9 +23,9 @@ on:
         required: true
         type: choice
         options:
-          - "userxp"
+          - "UserXP"
           - "playground"
-          - "evox"
+          - "EvoX"
         default: "playground"
       BUILD_CONFIG_file:
         description: 'Customized build.config file'
