@@ -9,8 +9,8 @@ permissions:
   actions: write
 
 env:
-  manifest_url: https://github.com/UserXP-web/kernel_build/manifest
-  manifest_branch: main
+  manifest_url: https://github.com/UserXP-web/kernel_build
+  manifest_branch: main/manifest
   sm_type: sm7435
   ZIP_PATH: 
   
@@ -143,7 +143,8 @@ jobs:
     # Initial the kernel manifest then sync after
     - name: Initialize Manifest and Sync
       run: |
-        MANIFEST_URL=${{ env.manifest_url }}/${{ inputs.MANIFEST_selection }}
+        MANIFEST_URL=${{ env.manifest_url }}
+        MANIFEST_BRANCH=${{ env.manifest_branch }}/${{ inputs.MANIFEST_selection }}
         mkdir -p android
         cd android
         #######################################################
@@ -151,7 +152,7 @@ jobs:
         #######################################################
         git config --global user.name "${{ github.actor }}"
         git config --global user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
-        repo init --depth=1 -u $MANIFEST_URL -b ${{ env.manifest_branch }}
+        repo init --depth=1 -u $MANIFEST_URL -b $MANIFEST_BRANCH
         repo sync
 
     - name: CORRECT stupid
