@@ -6,11 +6,11 @@
   
   <superproject name="kernel/superproject" remote="aosp" revision="common-android12-5.10-2025-12" />
 
-  <project path="sm7435" name="android_kernel_xiaomi_sm7435" clone-depth="1" remote="userxp" />
+  <project path="common" name="android_kernel_xiaomi_sm7435" clone-depth="1" remote="userxp" />
     
   <project path="build" name="kernel/build" remote="aosp" />
   <project path="hikey-modules" name="kernel/hikey-modules" revision="2e97927f068cd9d92a4b8039ef64c4467ca8985b" upstream="android12-5.10" dest-branch="android12-5.10" remote="aosp" />
-  <project path="common" name="kernel/common" revision="android12-5.10-2025-12" upstream="android12-5.10-2025-12" dest-branch="android12-5.10-2025-12" remote="aosp" />
+  <!-- <project path="common" name="kernel/common" revision="android12-5.10-2025-12" upstream="android12-5.10-2025-12" dest-branch="android12-5.10-2025-12" remote="aosp" /> -->
   <!-- Uncomment for local testing only -->
   <!-- project path="kernel/tests" name="kernel/tests" revision="main-kernel" clone-depth="1" remote="aosp" / -->
   <project path="kernel/configs" name="kernel/configs" remote="aosp" />
