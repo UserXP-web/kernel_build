@@ -19,6 +19,6 @@ jobs:
           android-version: 12
           #Android version for AOSP toolchain (Ignore if you want to use latest AOSP clang or use other clang)
           aosp-clang: true
-          aosp-clang-version: r383902b1 # r383902
+          aosp-clang-version: r383902b # r383902
           anykernel3: true
           anykernel3-url: https://github.com/WildPlusKernel/AnyKernel3
