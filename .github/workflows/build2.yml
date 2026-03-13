@@ -11,7 +11,7 @@ jobs:
       - name: Build
         uses: dabao1955/kernel_build_action@main
         with:
-          kernel-url: https://github.com/zylhdrXP/android_kernel_xiaomi_sm7435
+          kernel-url: https://github.com/UserXP-web/android_kernel_xiaomi_sm7435
           kernel-branch: lineage-23.2
           config: gki_defconfig
           arch: arm64
