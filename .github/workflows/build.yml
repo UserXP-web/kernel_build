@@ -83,8 +83,8 @@ jobs:
         sudo apt update
         sudo apt install -y ccache python3 git curl build-essential libssl-dev bison flex rsync libelf-dev dwarves clang libc++-dev libc++abi-dev device-tree-compiler bc g++
 
-        echo "============================================================================="
-        ls -la /usr/bin | grep clang
+        #echo "============================================================================="
+        #ls -la /usr/bin | grep clang
 
         # 克隆 GCC 工具链 (用于 5.x 内核)
         git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-6.4.1.git gcc
@@ -142,16 +142,16 @@ jobs:
         echo "BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> $GITHUB_ENV
 
 
-        echo "Cloning the llvm-Clang22 toolchain..." &&
-        #cd android
-        mkdir -p clang22 &&
-        aria2c -s16 -x16 -k1M https://github.com/bachnxuan/aosp_clang_mirror/releases/download/clang-r584948b-14726520/clang-r584948b.tar.gz -o clang.zip &&
-        tar -xf clang.zip -C clang22 &&
-        rm -rf clang.zip
+        #echo "Cloning the llvm-Clang22 toolchain..." &&
+        ##cd android
+        #mkdir -p clang22 &&
+        #aria2c -s16 -x16 -k1M https://github.com/bachnxuan/aosp_clang_mirror/releases/download/clang-r584948b-14726520/clang-r584948b.tar.gz -o clang.zip &&
+        #tar -xf clang.zip -C clang22 &&
+        #rm -rf clang.zip
 
-        WORKDIR="$(pwd)"
-        export PATH="$WORKDIR/clang22/bin:$PATH"
-        echo "PATH=$PATH"
+        #WORKDIR="$(pwd)"
+        #export PATH="$WORKDIR/clang22/bin:$PATH"
+        #echo "PATH=$PATH"
 
         git clone https://github.com/WildPlusKernel/AnyKernel3.git -b "gki-2.0"
 
