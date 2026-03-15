@@ -148,21 +148,6 @@ jobs:
         #export PATH="$WORKDIR/clang22/bin:$PATH"
         #echo "PATH=$PATH"
 
-        echo "============================================================================================="
-        clangVersion="r584948b" # r383902 r584948b
-        androidVersion="" # 12 [empty]
-        echo "'${androidVersion}'"
-        if [ "${androidVersion}" == "" ]; then
-          url2="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/mirror-goog-main-llvm-toolchain-source/clang-${clangVersion}.tar.gz"
-        else
-          url2="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android${androidVersion}-release/clang-${clangVersion}.tar.gz"
-        fi
-        mkdir -p clang &&
-        aria2c -s16 -x16 -k1M $url2 -o clang.zip &&
-        tar -xf clang.zip -C clang &&
-        rm -rf clang.zip
-        echo "============================================================================================="
-        
         git clone https://github.com/WildPlusKernel/AnyKernel3.git -b "gki-2.0"
 
     - name: Initialize Manifest and Sync
@@ -182,6 +167,27 @@ jobs:
         repo init --depth=1 -u $MANIFEST_URL -b $MANIFEST_BRANCH -m $MANIFEST_XML
         repo sync
 
+    - name: clang...
+      run: |
+        echo "============================================================================================="
+        clangVersion="r584948b" # r383902 r584948b
+        androidVersion="" # 12 [empty]        
+        if [ "${androidVersion}" == "" ]; then
+          url2="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/mirror-goog-main-llvm-toolchain-source/clang-${clangVersion}.tar.gz"
+        else
+          url2="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android${androidVersion}-release/clang-${clangVersion}.tar.gz"
+        fi
+        echo "Downloading... $url2"
+        mkdir -p clang &&
+        aria2c -s16 -x16 -k1M $url2 -o clang.zip &&
+        tar -xf clang.zip -C clang &&
+        rm -rf clang.zip
+        echo "============================================================================================="
+
+        WORKDIR="$(pwd)"
+        export PATH="$WORKDIR/clang/bin:$PATH"
+        echo "PATH=$PATH"
+        
     - name: CORRECT stupid
       run: |
         SUB_DIR=${{ env.manifest_folder }}
