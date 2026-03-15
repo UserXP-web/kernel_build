@@ -151,10 +151,10 @@ jobs:
         # =============================================================================================
         clangVersion="r584948b" # r383902 r584948b
         androidVersion="" # 12 <empty>
-        if ![[ 'androidVersion' == '' ]]; then
-          url2="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android${androidVersion}-release/clang-${clangVersion}.tar.gz"
-        else
+        if [[ 'androidVersion' == '' ]]; then
           url2="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/mirror-goog-main-llvm-toolchain-source/clang-${clangVersion}.tar.gz"
+        else
+          url2="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android${androidVersion}-release/clang-${clangVersion}.tar.gz"
         if
         mkdir -p clang
         aria2c -s16 -x16 -k1M $url2 -o clang.zip
