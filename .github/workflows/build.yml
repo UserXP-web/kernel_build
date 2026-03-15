@@ -150,7 +150,8 @@ jobs:
 
         echo "============================================================================================="
         clangVersion="r584948b" # r383902 r584948b
-        androidVersion="" # 12 <empty>
+        androidVersion="" # 12 [empty]
+        echo "'${androidVersion}'"
         if [ '${androidVersion}' == '' ]; then
           url2="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/mirror-goog-main-llvm-toolchain-source/clang-${clangVersion}.tar.gz"
         else
