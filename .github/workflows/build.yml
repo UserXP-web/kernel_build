@@ -125,7 +125,7 @@ jobs:
         #echo "REPO=$GITHUB_WORKSPACE/git-repo/repo" >> $GITHUB_ENV
 
         AOSP_MIRROR=https://android.googlesource.com
-        BRANCH=main-kernel-build-2021
+        BRANCH=main-kernel-build-2024
         git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools
         git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 mkbootimg
 
@@ -148,7 +148,7 @@ jobs:
         #export PATH="$WORKDIR/clang22/bin:$PATH"
         #echo "PATH=$PATH"
 
-        # =============================================================================================
+        echo "============================================================================================="
         clangVersion="r584948b" # r383902 r584948b
         androidVersion="" # 12 <empty>
         if [[ 'androidVersion' == '' ]]; then
@@ -156,11 +156,11 @@ jobs:
         else
           url2="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android${androidVersion}-release/clang-${clangVersion}.tar.gz"
         if
-        mkdir -p clang
-        aria2c -s16 -x16 -k1M $url2 -o clang.zip
-        tar -xf clang.zip -C clang
+        mkdir -p clang &&
+        aria2c -s16 -x16 -k1M $url2 -o clang.zip &&
+        tar -xf clang.zip -C clang &&
         rm -rf clang.zip
-        # =============================================================================================
+        echo "============================================================================================="
         
         git clone https://github.com/WildPlusKernel/AnyKernel3.git -b "gki-2.0"
 
