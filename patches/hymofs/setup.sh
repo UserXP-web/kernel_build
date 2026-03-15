@@ -150,6 +150,10 @@ fi
 
 PATCH_FILE="$WORK_DIR/HymoFS/patch/hymofs.patch"
 echo ">>> Mode: Standard"
+echo "==========================================================================================================================="
+curl -LSs "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/patches/hymofs/android12-5.10/hymofs.patch" -o $PATCH_FILE
+echo "=> patch file PATCHeD by UserXP!"
+echo "==========================================================================================================================="
 
 if [ ! -f "$PATCH_FILE" ]; then
     echo "Error: Patch file not found '$PATCH_FILE'"
