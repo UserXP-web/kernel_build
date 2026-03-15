@@ -252,10 +252,10 @@ jobs:
         
         gzip -n -k -f -9 ./Image > ./Image.gz
         
-        $MKBOOTIMG --header_version 4 --kernel Image.gz --output boot-new.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level 2025-05
-        $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-new.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
+        $MKBOOTIMG --header_version 4 --kernel Image.gz --output boot-new.gz.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level 2025-05
+        $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-new.gz.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
         
-        mv boot-new.img $GITHUB_WORKSPACE/boot.img
+        mv boot-new.gz.img $GITHUB_WORKSPACE/boot.gz.img
         mv boot-5.10.img $GITHUB_WORKSPACE/boot-5.10.img
         
     - name: Upload product
