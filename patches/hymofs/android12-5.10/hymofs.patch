@@ -3404,15 +3404,7 @@ index c6a2e1098..4f050cd0d 100644
  
  #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
  extern void susfs_generic_fillattr_spoofer(struct inode *inode, struct kstat *stat);
-@@ -82,6 +85,7 @@ int vfs_getattr_nosec(const struct path *path, struct kstat *stat,
- 		      u32 request_mask, unsigned int query_flags)
- {
- 	struct inode *inode = d_backing_inode(path->dentry);
-+	int ret;
- 
- 	memset(stat, 0, sizeof(*stat));
- 	stat->result_mask |= STATX_BASIC_STATS;
-@@ -110,16 +114,27 @@ int vfs_getattr_nosec(const struct path *path, struct kstat *stat,
+@@ -110,16 +113,26 @@ int vfs_getattr_nosec(const struct path *path, struct kstat *stat,
  	{
  		int err = inode->i_op->getattr(path, stat, request_mask,
  					    query_flags);
@@ -3423,12 +3415,12 @@ index c6a2e1098..4f050cd0d 100644
  			susfs_generic_fillattr_spoofer(inode, stat);
  		return err;
  	}
- #else	
+ #else
 -		return inode->i_op->getattr(path, stat, request_mask,
-+		ret = inode->i_op->getattr(path, stat, request_mask,
++		int ret = inode->i_op->getattr(path, stat, request_mask,
  					    query_flags);
 +#ifdef CONFIG_HYMOFS_STAT_SPOOF
-+	hymofs_post_getattr(path, inode, stat, ret);
++		hymofs_post_getattr(path, inode, stat, ret);
 +#endif
 +		return ret;
  #endif
