@@ -136,18 +136,6 @@ jobs:
         openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 > ./kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem
         echo "BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> $GITHUB_ENV
 
-
-        #echo "Cloning the llvm-Clang22 toolchain..." &&
-        ##cd android
-        #mkdir -p clang22 &&
-        #aria2c -s16 -x16 -k1M https://github.com/bachnxuan/aosp_clang_mirror/releases/download/clang-r584948b-14726520/clang-r584948b.tar.gz -o clang.zip &&
-        #tar -xf clang.zip -C clang22 &&
-        #rm -rf clang.zip
-
-        #WORKDIR="$(pwd)"
-        #export PATH="$WORKDIR/clang22/bin:$PATH"
-        #echo "PATH=$PATH"
-
         git clone https://github.com/WildPlusKernel/AnyKernel3.git -b "gki-2.0"
 
     - name: Initialize Manifest and Sync
@@ -169,23 +157,25 @@ jobs:
 
     - name: clang...
       run: |
-        echo "============================================================================================="
+        cd android/prebuilts-master/clang/host/linux-x86
+        clang_PATH="clang-r563880b"
         clangVersion="r584948b" # r383902 r584948b
         androidVersion="" # 12 [empty]        
+        echo "============================================================================================="
         if [ "${androidVersion}" == "" ]; then
           url2="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/mirror-goog-main-llvm-toolchain-source/clang-${clangVersion}.tar.gz"
         else
           url2="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android${androidVersion}-release/clang-${clangVersion}.tar.gz"
         fi
         echo "Downloading... $url2"
-        mkdir -p clang-r563880b &&
+        mkdir -p $clang_PATH &&
         aria2c -s16 -x16 -k1M $url2 -o clang.zip &&
-        tar -xf clang.zip -C clang-r563880b &&
+        tar -xf clang.zip -C $clang_PATH &&
         rm -rf clang.zip
         echo "============================================================================================="
 
         WORKDIR="$(pwd)"
-        export PATH="$WORKDIR/clang-r563880b/bin:$PATH"
+        export PATH="$WORKDIR/$clang_PATH/bin:$PATH"
         echo "PATH=$PATH"
         
     - name: CORRECT stupid
