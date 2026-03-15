@@ -58,8 +58,8 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
     
-    - name: Cleanup
-      uses: rokibhasansagar/slimhub_actions@main
+    #- name: Cleanup
+    #  uses: rokibhasansagar/slimhub_actions@main
       
     - name: Set Swap Space
       uses: pierotofy/set-swap-space@master
@@ -125,7 +125,7 @@ jobs:
         #echo "REPO=$GITHUB_WORKSPACE/git-repo/repo" >> $GITHUB_ENV
 
         AOSP_MIRROR=https://android.googlesource.com
-        BRANCH=main-kernel-build-2024
+        BRANCH=main-kernel-build-2021
         git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools
         git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 mkbootimg
 
