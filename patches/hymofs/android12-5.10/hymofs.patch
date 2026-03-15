@@ -3425,18 +3425,17 @@ index c6a2e1098..4f050cd0d 100644
  	}
  #else	
 -		return inode->i_op->getattr(path, stat, request_mask,
-+	ret = inode->i_op->getattr(path, stat, request_mask,
++		ret = inode->i_op->getattr(path, stat, request_mask,
  					    query_flags);
 +#ifdef CONFIG_HYMOFS_STAT_SPOOF
 +	hymofs_post_getattr(path, inode, stat, ret);
 +#endif
-+	return ret
++		return ret;
  #endif
  
  	generic_fillattr(inode, stat);
 +#ifdef CONFIG_HYMOFS_STAT_SPOOF
-+	ret = 0;
-+	hymofs_post_getattr(path, inode, stat, ret);
++	hymofs_post_getattr(path, inode, stat, 0);
 +#endif
  	return 0;
  }
