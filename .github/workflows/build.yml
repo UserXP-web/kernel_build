@@ -47,6 +47,11 @@ on:
         type: boolean
         required: true
         default: false
+      clang_VERSION:
+        description: 'clang version [def=r383902 latest(?)=r584948b]'
+        type: string
+        required: true
+        default: 'r584948b'
 
 jobs:
   build:
@@ -157,10 +162,11 @@ jobs:
 
     - name: clang...
       run: |
-        cd android/prebuilts-master/clang/host/linux-x86
-        clang_PATH="clang-r563880b"
-        clangVersion="r584948b" # r383902 r584948b
-        androidVersion="" # 12 [empty]        
+        cd android/prebuilts-master/clang/host/linux-x86        
+        clangVersion=${{ inputs.clang_VERSION }} # r383902 r584948b
+        clang_PATH="clang-$clangVersion"
+        androidVersion="" # 12 or [empty]
+        if [ "${clangVersion}" == "r383902" ]; then androidVersion='12'; fi        
         echo "============================================================================================="
         if [ "${androidVersion}" == "" ]; then
           url2="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/mirror-goog-main-llvm-toolchain-source/clang-${clangVersion}.tar.gz"
