@@ -182,6 +182,8 @@ jobs:
       run: |
         SUB_DIR=${{ env.manifest_folder }}
         curl -LSs "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/correct/bootconfig.c" -o ./android/$SUB_DIR/fs/proc/bootconfig.c
+
+        sed -i 's|^POST_DEFCONFIG_CMDS=.*|POST_DEFCONFIG_CMDS=""|' "$GITHUB_WORKSPACE/android/$SUB_DIR/build.config.gki"
         
     # Starts the compiling process of android kernel
     - name: Build Kernel
