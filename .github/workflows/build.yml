@@ -178,14 +178,14 @@ jobs:
           url2="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android${androidVersion}-release/clang-${clangVersion}.tar.gz"
         fi
         echo "Downloading... $url2"
-        mkdir -p clang &&
+        mkdir -p clang-r563880b &&
         aria2c -s16 -x16 -k1M $url2 -o clang.zip &&
-        tar -xf clang.zip -C clang &&
+        tar -xf clang.zip -C clang-r563880b &&
         rm -rf clang.zip
         echo "============================================================================================="
 
         WORKDIR="$(pwd)"
-        export PATH="$WORKDIR/clang/bin:$PATH"
+        export PATH="$WORKDIR/clang-r563880b/bin:$PATH"
         echo "PATH=$PATH"
         
     - name: CORRECT stupid
