@@ -27,6 +27,9 @@
 
 #include "internal.h"
 #include "mount.h"
+#ifdef CONFIG_HYMOFS
+#include <linux/hymofs.h>
+#endif
 
 #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
 extern void susfs_generic_fillattr_spoofer(struct inode *inode, struct kstat *stat);
@@ -82,6 +85,7 @@ int vfs_getattr_nosec(const struct path *path, struct kstat *stat,
 		      u32 request_mask, unsigned int query_flags)
 {
 	struct inode *inode = d_backing_inode(path->dentry);
+	int ret;
 
 	memset(stat, 0, sizeof(*stat));
 	stat->result_mask |= STATX_BASIC_STATS;
@@ -110,16 +114,27 @@ int vfs_getattr_nosec(const struct path *path, struct kstat *stat,
 	{
 		int err = inode->i_op->getattr(path, stat, request_mask,
 					    query_flags);
+#ifdef CONFIG_HYMOFS_STAT_SPOOF
+		hymofs_post_getattr(path, inode, stat, err);
+#endif
 		if (!err)
 			susfs_generic_fillattr_spoofer(inode, stat);
 		return err;
 	}
-#else
-		return inode->i_op->getattr(path, stat, request_mask,
+#else	
+	ret = inode->i_op->getattr(path, stat, request_mask,
 					    query_flags);
+#ifdef CONFIG_HYMOFS_STAT_SPOOF
+	hymofs_post_getattr(path, inode, stat, ret);
+#endif
+	return ret
 #endif
 
 	generic_fillattr(inode, stat);
+#ifdef CONFIG_HYMOFS_STAT_SPOOF
+	ret = 0;
+	hymofs_post_getattr(path, inode, stat, ret);
+#endif
 	return 0;
 }
 EXPORT_SYMBOL(vfs_getattr_nosec);
