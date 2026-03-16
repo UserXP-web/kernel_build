@@ -49,7 +49,7 @@ on:
         required: true
         default: 'Image'
       clang_VERSION:
-        description: 'clang ver [def=r383902 latest(?)=r584948b]'
+        description: 'clang [r383902, r416183b, r584948b]'
         type: string
         required: true
         default: 'r584948b'
