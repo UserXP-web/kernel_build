@@ -16,6 +16,7 @@ env:
   manifest_url: 'https://github.com/UserXP-web/kernel_build'
   manifest_branch: 'main'
   manifest_folder: 'common' # sm7435
+  lz4kd: true
   ZIP_PATH: ''
   
 on:
@@ -37,6 +38,12 @@ on:
         description: 'Customized build.config file'
         required: true
         default: 'build.config.gki.aarch64'
+
+      BUILD_METHOD_MAKE:
+        description: 'Use Make as build method'
+        type: boolean
+        required: true
+        default: true
         
       KERNEL_IMAGE_NAME:
         description: 'Image, Image.gz, Image.gz-dtb, etc.'
@@ -65,13 +72,19 @@ jobs:
     
     #- name: Cleanup
     #  uses: rokibhasansagar/slimhub_actions@main
-      
-    - name: Set Swap Space
-      uses: pierotofy/set-swap-space@master
+
+    - name: "🚀 Maximize Build Space"
+      #if: ${{ env.KERNEL_VERSION == '5.10' || env.KERNEL_VERSION == '5.15' }}
+      uses: easimon/maximize-build-space@master
       with:
-        swap-size-gb: 32
-    
-    - name: recover Ccache
+        root-reserve-mb: 8192
+        temp-reserve-mb: 4096
+        remove-dotnet: 'true'
+        remove-android: 'true'
+        remove-haskell: 'true'
+        remove-codeql: 'true'
+
+    - name: 💾 Recover Ccache
       if: true
       uses: actions/cache@v4
       with:
@@ -84,51 +97,47 @@ jobs:
         #  ccache-gki-${{ env.SUB_LEVEL }}-
         #  ccache-gki-
 
-    - name: Build Environment
+    - name: 📦 Build Environment (Cache & Install Dependencies)
       run: |
         sudo apt update
         sudo apt install -y ccache python3 git curl build-essential libssl-dev bison flex rsync libelf-dev dwarves clang libc++-dev libc++abi-dev device-tree-compiler bc g++
+        #sudo apt install -y curl ccache libelf-dev build-essential flex bison libssl-dev libncurses-dev liblz4-tool zlib1g-dev libxml2-utils rsync unzip gawk dos2unix
 
-        #echo "============================================================================="
-        #ls -la /usr/bin | grep clang
-
-    - name: Configuration Ccache
+    - name: ⚙️ Configuration Ccache
       if: true
       run: |
         mkdir -p ~/.ccache
         echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
-
         # Set maximum cache 10G
         ccache -M 10G
         ccache --set-config=sloppiness=time_macros,file_macro,include_file_ctime,include_file_mtime
         ccache --set-config=compiler_check=content
         ccache --set-config=compression=true
-
         # Clear statistical data
         ccache -z
 
-    # Install repo tool
-    - name: Install Repo Tool
-      if: true
+    - name: "🔐 Configure Git"
+      run: |
+        echo "🔧 Configuring Git user information..."
+        git config --global user.name "${{ github.actor }}"
+        git config --global user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+        echo "✅ Git configuration complete."
+        
+    - name: 📥 Install Repo Tool
       run: |
         if ! command -v repo &> /dev/null; then
-            echo "Installing 'repo'..."
+            echo "⬇️ Installing 'repo'..."
             mkdir -p ~/bin  # Create bin directory if it doesn't exist
             curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
             chmod a+x ~/bin/repo
             sudo ln -sf ~/bin/repo /usr/bin/repo
-            echo "...installed!"
+            echo "✅ The repo tool is installed."
         else
-            echo "'repo' command exist."
+            echo "ℹ️ 'repo' command exist."
         fi
 
-    - name: Download toolchain
+    - name: ⬇️ Download toolchain
       run: |
-        #mkdir -p ./git-repo
-        #curl https://storage.googleapis.com/git-repo-downloads/repo > ./git-repo/repo
-        #chmod a+rx ./git-repo/repo
-        #echo "REPO=$GITHUB_WORKSPACE/git-repo/repo" >> $GITHUB_ENV
-
         AOSP_MIRROR=https://android.googlesource.com
         BRANCH=main-kernel-build-2024
         git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools
@@ -141,25 +150,63 @@ jobs:
         openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 > ./kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem
         echo "BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> $GITHUB_ENV
 
-        git clone https://github.com/WildPlusKernel/AnyKernel3.git -b "gki-2.0"
-
-    - name: Initialize Manifest and Sync
-      run: |
-        MANIFEST_URL=${{ env.manifest_url }}
-        MANIFEST_BRANCH=${{ env.manifest_branch }}
-        MANIFEST_XML=manifest/${{ inputs.MANIFEST_selection }}.xml
-        echo "~ $MANIFEST_URL ^^^ $MANIFEST_BRANCH" --- $MANIFEST_XML
-        
-        mkdir -p android
-        cd android
         #######################################################
         git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-6.4.1.git gcc
         #######################################################
-        git config --global user.name "${{ github.actor }}"
-        git config --global user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
-        repo init --depth=1 -u $MANIFEST_URL -b $MANIFEST_BRANCH -m $MANIFEST_XML
-        repo sync
+        
+        # AnyKernel3
+        git clone https://github.com/WildPlusKernel/AnyKernel3.git -b "gki-2.0"
 
+    - name: ⬇️ Clone Kernel Source
+      run: |
+        mkdir -p android && cd android
+        
+        echo "🌐 Initialize kernel repository..."
+        MANIFEST_URL=${{ env.manifest_url }}
+        MANIFEST_BRANCH=${{ env.manifest_branch }}
+        MANIFEST_XML=manifest/${{ inputs.MANIFEST_selection }}.xml
+        echo "~ $MANIFEST_URL ^^^ $MANIFEST_BRANCH --- $MANIFEST_XML"        
+        repo init --depth=1 -u $MANIFEST_URL -b $MANIFEST_BRANCH -m $MANIFEST_XML
+
+        echo "🔄 Synchronize the codebase (using $(nproc --all) threads)..."
+        repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle --force-sync
+
+        echo "✅ Kernel source code cloning complete"
+
+    - name: ⚙️ Configure Kernel Options
+      run: |
+        cd android
+        echo "⚙️ Configuring kernel compilation options..."
+        KERNEL_FOLDER=${{ env.manifest_folder }}
+
+        echo "📦 Mountify (backslashxx/mountify)"
+        echo "CONFIG_TMPFS_XATTR=y" >> ./$KERNEL_FOLDER/arch/arm64/configs/gki_defconfig
+        echo "CONFIG_TMPFS_POSIX_ACL=y" >> ./$KERNEL_FOLDER/arch/arm64/configs/gki_defconfig
+
+        if [ "${{ env.lz4kd }}" == "true" ]; then
+          echo "📦 Enable lz4kd compression..."
+          echo "CONFIG_CRYPTO_LZ4KD=y" >> ./$KERNEL_FOLDER/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_CRYPTO_LZ4K_OPLUS=y" >> ./$KERNEL_FOLDER/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_ZRAM_WRITEBACK=y" >> ./$KERNEL_FOLDER/arch/arm64/configs/gki_defconfig
+        fi
+        
+        # for [ "${{ env.KERNEL_VERSION }}" = "5.10" ] || [ "${{ env.KERNEL_VERSION }}" = "5.15" ]
+        echo "📦 Configuring LTO for 5.10/5.15 series..."
+        DEFCONFIG=./$KERNEL_FOLDER/arch/arm64/configs/gki_defconfig
+        sed -i 's/^CONFIG_LTO=n/CONFIG_LTO=y/' "$DEFCONFIG"
+        sed -i 's/^CONFIG_LTO_CLANG_FULL=y/CONFIG_LTO_CLANG_THIN=y/' "$DEFCONFIG"
+        sed -i 's/^CONFIG_LTO_CLANG_NONE=y/CONFIG_LTO_CLANG_THIN=y/' "$DEFCONFIG"
+        grep -q '^CONFIG_LTO_CLANG_THIN=y' "$DEFCONFIG" || echo 'CONFIG_LTO_CLANG_THIN=y' >> "$DEFCONFIG"
+
+        #Skip the unnecessary step of installing the UAPI standard header to the usr/include directory, saving compilation time.
+        echo "CONFIG_HEADERS_INSTALL=n" >> ./$KERNEL_FOLDER/arch/arm64/configs/gki_defconfig
+
+        # Remove check_defconfig
+        #sed -i 's|^POST_DEFCONFIG_CMDS=.*|POST_DEFCONFIG_CMDS=""|' "$GITHUB_WORKSPACE/android/$SUB_DIR/build.config.gki"
+        sed -i 's/check_defconfig//' ./$KERNEL_FOLDER/build.config.gki
+        
+        echo "✅ Kernel configuration update complete"
+        
     - name: clang...
       run: |
         cd android/prebuilts-master/clang/host/linux-x86        
@@ -182,55 +229,72 @@ jobs:
 
         WORKDIR="$(pwd)"
         export PATH="$WORKDIR/$clang_PATH/bin:$PATH"
+        export PATH="/usr/lib/ccache:$PATH"
         echo "PATH=$PATH"
         
     - name: CORRECT stupid
       run: |
         SUB_DIR=${{ env.manifest_folder }}
         curl -LSs "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/correct/bootconfig.c" -o ./android/$SUB_DIR/fs/proc/bootconfig.c
-
-        sed -i 's|^POST_DEFCONFIG_CMDS=.*|POST_DEFCONFIG_CMDS=""|' "$GITHUB_WORKSPACE/android/$SUB_DIR/build.config.gki"
         
-    # Starts the compiling process of android kernel
-    - name: Build Kernel
+    - name: 🔨 Build Kernel
       run: |
+        echo "🏗️ Start kernel compilation..."
         cd android
         ROOT=${{ env.manifest_folder }}
-        B_CONFIG=$ROOT/${{ inputs.BUILD_CONFIG_file }}        
-        sed -i 's/BUILD_SYSTEM_DLKM=1/BUILD_SYSTEM_DLKM=0/' ./$B_CONFIG
-        sed -i '\#MODULES_ORDER=android/gki_aarch64_modules#d' ./$B_CONFIG
-        sed -i '/KMI_SYMBOL_LIST_STRICT_MODE/d' ./$B_CONFIG
-
-        # *********************************************************************************
-        if [ '${{ inputs.MANIFEST_selection }}' == 'EvoX' ]; then 
-          sed -i 's/SUBLEVEL =.*/SUBLEVEL = 236/' ./$ROOT/Makefile;
-        fi
-        # *********************************************************************************
-
-        echo "Start compiling..."
-        # Ensure that the environment variables contain CCACHE_DIR
-        export CCACHE_DIR=$HOME/.ccache
-        export CCACHE_EXEC=/usr/bin/ccache
-        echo "KBUILD_BUILD_TIMESTAMP=${KBUILD_BUILD_TIMESTAMP:-<empty>}"
-        echo "LOCALVERSION=${LOCALVERSION:-<empty>}"
+        B_CONFIG=$ROOT/${{ inputs.BUILD_CONFIG_file }}
         
-        #BUILD_CONFIG="$B_CONFIG" build/build.sh # 2>&1 | tee build.log
-        #LTO=thin BUILD_CONFIG="$B_CONFIG" build/build.sh # 2>&1 | tee build.log
-        LTO=thin BUILD_CONFIG=$B_CONFIG build/build.sh CC="/usr/bin/ccache clang"
+        if ${{ inputs.BUILD_METHOD_MAKE }} == "true" ]; then
+          #export PATH="$GITHUB_WORKSPACE/android/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin:$PATH"
+          #export PATH="/usr/lib/ccache:$PATH"
+          #sudo apt install libelf-dev
+          cd $ROOT
+          #make -j$(nproc --all) LLVM_IAS=1 LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out gki_defconfig all
+          make -j$(nproc --all) LLVM_IAS=1 LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out "$B_CONFIG" all
+        else          
+          sed -i 's/BUILD_SYSTEM_DLKM=1/BUILD_SYSTEM_DLKM=0/' ./$B_CONFIG
+          sed -i '\#MODULES_ORDER=android/gki_aarch64_modules#d' ./$B_CONFIG
+          sed -i '/KMI_SYMBOL_LIST_STRICT_MODE/d' ./$B_CONFIG
+  
+          # *********************************************************************************
+          if [ '${{ inputs.MANIFEST_selection }}' == 'EvoX' ]; then 
+            sed -i 's/SUBLEVEL =.*/SUBLEVEL = 236/' ./$ROOT/Makefile;
+          fi
+          # *********************************************************************************
+  
+          echo "Start compiling..."
+          # Ensure that the environment variables contain CCACHE_DIR
+          export CCACHE_DIR=$HOME/.ccache
+          export CCACHE_EXEC=/usr/bin/ccache
+          echo "KBUILD_BUILD_TIMESTAMP=${KBUILD_BUILD_TIMESTAMP:-<empty>}"
+          echo "LOCALVERSION=${LOCALVERSION:-<empty>}"
+          
+          #BUILD_CONFIG="$B_CONFIG" build/build.sh # 2>&1 | tee build.log
+          #LTO=thin BUILD_CONFIG="$B_CONFIG" build/build.sh # 2>&1 | tee build.log
+          LTO=thin BUILD_CONFIG=$B_CONFIG build/build.sh CC="/usr/bin/ccache clang"
+        fi
 
         echo "Ccache statistics:"
         ccache -s
+        echo "✅ Kernel compilation complete"
+
+    - name: 🧠 Set Artifact Name
+      id: set_name
+      run: |
+        ARTIFACT_NAME="garnet-${{ inputs.MANIFEST_selection }}_android12-5.10-236"
+        if [ "${{ env.lz4kd }}" = "true" ]; then ARTIFACT_NAME="${ARTIFACT_NAME}_lz4kd"; fi
+        echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> $GITHUB_OUTPUT
         
-    - name: Setup kernel
+    - name: 📦 Package kernel
       continue-on-error: true
       run: |
         cd AnyKernel3
         cp ../android/out/android12-5.10/dist/Image ./
-        ZIP_NAME="garnet-${{ inputs.MANIFEST_selection }}_android12-5.10-236.zip"
+        ZIP_NAME=${{ steps.set_name.outputs.ARTIFACT_NAME }}.zip
         zip -r "$ZIP_NAME" ./*
         echo "ZIP_PATH=$GITHUB_WORKSPACE/AnyKernel3/$ZIP_NAME" >> $GITHUB_ENV
 
-    - name: Boot.img
+    - name: ✅ Boot.img
       if: true
       run: |
         cd "android/out/android12-5.10/dist"
@@ -257,11 +321,13 @@ jobs:
         
         mv boot-new.gz.img $GITHUB_WORKSPACE/boot.gz.img
         mv boot-5.10.img $GITHUB_WORKSPACE/boot-5.10.img
+
+        echo "✅ Kernel packaging complete"
         
-    - name: Upload product
+    - name: 📤 Upload AnyKernel3 etc...
       uses: actions/upload-artifact@v4
       with:
-        name: Garnet-kernel_${{ inputs.MANIFEST_selection }}
+        name: ${{ steps.set_name.outputs.ARTIFACT_NAME }}.zip # Garnet-kernel_${{ inputs.MANIFEST_selection }}
         path: |
           ${{ env.ZIP_PATH }}
           *.img
