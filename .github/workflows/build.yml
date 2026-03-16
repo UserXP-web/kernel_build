@@ -49,13 +49,8 @@ on:
         description: 'Image, Image.gz, Image.gz-dtb, etc.'
         required: true
         default: 'Image'
-      ANYKERNEL3:
-        description: 'Make flashable AnyKernel3 zip'
-        type: boolean
-        required: true
-        default: false
       clang_VERSION:
-        description: 'clang version [def=r383902 latest(?)=r584948b]'
+        description: 'clang ver [def=r383902 latest(?)=r584948b]'
         type: string
         required: true
         default: 'r584948b'
