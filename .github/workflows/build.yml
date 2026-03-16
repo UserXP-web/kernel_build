@@ -242,7 +242,7 @@ jobs:
           #export PATH="/usr/lib/ccache:$PATH"
           #sudo apt install libelf-dev
           sudo apt-get install lld
-          sudo apt-get install llvm-10*
+          sudo apt-get install llvm
           cd $ROOT
           B_CONFIG=${{ inputs.BUILD_CONFIG_file }}
           make -j$(nproc --all) LLVM_IAS=1 LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out gki_defconfig all
