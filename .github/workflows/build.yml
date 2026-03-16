@@ -236,7 +236,7 @@ jobs:
       run: |
         echo "🏗️ Start kernel compilation..."
         cd android
-        ROOT=${{ env.manifest_folder }}        
+        ROOT=${{ env.manifest_folder }}
         
         if ${{ inputs.BUILD_METHOD_MAKE }} == "true" ]; then
           #export PATH="$GITHUB_WORKSPACE/android/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin:$PATH"
@@ -284,13 +284,17 @@ jobs:
         echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> $GITHUB_OUTPUT
         
     - name: 📦 Package kernel
-      run: |
-        cd AnyKernel3
+      run: |        
         if ${{ inputs.BUILD_METHOD_MAKE }} == "true" ]; then
-          cp ../android/common/out/dist/Image ./          
+          image_path=$(find "./android/${{ env.manifest_folder }}/out/" -name "Image" | head -n 1)
+          if [ -n "$image_path" ] && [ -f "$image_path" ]; then
+            echo "Image file finally located at: $image_path"
+            cp "$image_path" ./AnyKernel3/Image
+          fi
         else
-          cp ../android/out/android12-5.10/dist/Image ./
-        fi        
+          cp ./android/out/android12-5.10/dist/Image ./AnyKernel3/
+        fi
+        cd AnyKernel3
         ZIP_NAME=${{ steps.set_name.outputs.ARTIFACT_NAME }}.zip
         zip -r "$ZIP_NAME" ./*
         echo "ZIP_PATH=$GITHUB_WORKSPACE/AnyKernel3/$ZIP_NAME" >> $GITHUB_ENV
@@ -298,13 +302,16 @@ jobs:
     - name: 🧠 Boot.img
       if: true
       run: |
+        mkdir bootimgs
         if ${{ inputs.BUILD_METHOD_MAKE }} == "true" ]; then
-          cd "android/common/out/dist"
+          image_path=$(find "./android/${{ env.manifest_folder }}/out/" -name "Image" | head -n 1)
+          if [ -n "$image_path" ] && [ -f "$image_path" ]; then
+            cp "$image_path" ./bootimgs/Image
+          fi
         else
-          cd "android/out/android12-5.10/dist"
-        fi        
-        mkdir bootimgs && cd bootimgs
-        cp ../Image ./
+          cp ./android/out/android12-5.10/dist/Image ./bootimgs/
+        fi  
+        cd bootimgs
         
         GKI_URL="https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-2025-05_r7.zip"
         
