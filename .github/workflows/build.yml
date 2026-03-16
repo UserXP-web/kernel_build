@@ -295,7 +295,7 @@ jobs:
           cp ./android/out/android12-5.10/dist/Image ./AnyKernel3/
         fi
         cd AnyKernel3
-        ZIP_NAME=${{ steps.set_name.outputs.ARTIFACT_NAME }}.zip
+        ZIP_NAME=${{ steps.set_name.outputs.ARTIFACT_NAME }}-AnyKernel3.zip
         zip -r "$ZIP_NAME" ./*
         echo "ZIP_PATH=$GITHUB_WORKSPACE/AnyKernel3/$ZIP_NAME" >> $GITHUB_ENV
 
