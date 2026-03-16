@@ -23,7 +23,6 @@ on:
   workflow_dispatch:
     inputs:
       MANIFEST_selection:
-        # .../sm7435/< Customized build.config file >
         description: "Select github source for kernel"
         required: true
         type: choice
@@ -236,17 +235,18 @@ jobs:
       run: |
         echo "🏗️ Start kernel compilation..."
         cd android
-        ROOT=${{ env.manifest_folder }}
-        B_CONFIG=$ROOT/${{ inputs.BUILD_CONFIG_file }}
+        ROOT=${{ env.manifest_folder }}        
         
-        if ${{ inputs.BUILD_METHOD_MAKE }} == "true" ]; then
+        if ${{ inputs.BUILD_METHOD_MAKE }} == "true" ]; then          
           #export PATH="$GITHUB_WORKSPACE/android/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin:$PATH"
           #export PATH="/usr/lib/ccache:$PATH"
           #sudo apt install libelf-dev
           cd $ROOT
+          B_CONFIG=${{ inputs.BUILD_CONFIG_file }}
           #make -j$(nproc --all) LLVM_IAS=1 LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out gki_defconfig all
           make -j$(nproc --all) LLVM_IAS=1 LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out "$B_CONFIG" all
-        else          
+        else
+          B_CONFIG=$ROOT/${{ inputs.BUILD_CONFIG_file }}
           sed -i 's/BUILD_SYSTEM_DLKM=1/BUILD_SYSTEM_DLKM=0/' ./$B_CONFIG
           sed -i '\#MODULES_ORDER=android/gki_aarch64_modules#d' ./$B_CONFIG
           sed -i '/KMI_SYMBOL_LIST_STRICT_MODE/d' ./$B_CONFIG
