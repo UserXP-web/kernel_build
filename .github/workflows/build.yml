@@ -141,6 +141,7 @@ jobs:
         echo "UNPACK_BOOTIMG=$GITHUB_WORKSPACE/mkbootimg/unpack_bootimg.py" >> $GITHUB_ENV
         echo "AVBTOOL=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/avbtool" >> $GITHUB_ENV
 
+        # Generate RSA key for signing boot.img
         openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 > ./kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem
         echo "BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> $GITHUB_ENV
 
@@ -237,7 +238,7 @@ jobs:
         cd android
         ROOT=${{ env.manifest_folder }}        
         
-        if ${{ inputs.BUILD_METHOD_MAKE }} == "true" ]; then          
+        if ${{ inputs.BUILD_METHOD_MAKE }} == "true" ]; then
           #export PATH="$GITHUB_WORKSPACE/android/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin:$PATH"
           #export PATH="/usr/lib/ccache:$PATH"
           #sudo apt install libelf-dev
@@ -283,10 +284,13 @@ jobs:
         echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> $GITHUB_OUTPUT
         
     - name: 📦 Package kernel
-      continue-on-error: true
       run: |
         cd AnyKernel3
-        cp ../android/out/android12-5.10/dist/Image ./
+        if ${{ inputs.BUILD_METHOD_MAKE }} == "true" ]; then
+          cp ../android/out/dist/Image ./          
+        else
+          cp ../android/out/android12-5.10/dist/Image ./
+        fi        
         ZIP_NAME=${{ steps.set_name.outputs.ARTIFACT_NAME }}.zip
         zip -r "$ZIP_NAME" ./*
         echo "ZIP_PATH=$GITHUB_WORKSPACE/AnyKernel3/$ZIP_NAME" >> $GITHUB_ENV
@@ -294,7 +298,11 @@ jobs:
     - name: 🧠 Boot.img
       if: true
       run: |
-        cd "android/out/android12-5.10/dist"
+        if ${{ inputs.BUILD_METHOD_MAKE }} == "true" ]; then
+          cd "android/out/dist"
+        else
+          cd "android/out/android12-5.10/dist"
+        fi        
         mkdir bootimgs && cd bootimgs
         cp ../Image ./
         
