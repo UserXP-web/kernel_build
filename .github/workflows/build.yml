@@ -201,7 +201,7 @@ jobs:
         
         echo "✅ Kernel configuration update complete"
         
-    - name: clang...
+    - name: 📝 clang...
       run: |
         cd android/prebuilts-master/clang/host/linux-x86        
         clangVersion=${{ inputs.clang_VERSION }} # r383902 r584948b
@@ -226,7 +226,7 @@ jobs:
         export PATH="/usr/lib/ccache:$PATH"
         echo "PATH=$PATH"
         
-    - name: CORRECT stupid
+    - name: ✅ CORRECT stupid
       run: |
         SUB_DIR=${{ env.manifest_folder }}
         curl -LSs "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/correct/bootconfig.c" -o ./android/$SUB_DIR/fs/proc/bootconfig.c
@@ -240,11 +240,11 @@ jobs:
         if ${{ inputs.BUILD_METHOD_MAKE }} == "true" ]; then          
           #export PATH="$GITHUB_WORKSPACE/android/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin:$PATH"
           #export PATH="/usr/lib/ccache:$PATH"
-          #sudo apt install libelf-dev
+          sudo apt install libelf-dev
           cd $ROOT
           B_CONFIG=${{ inputs.BUILD_CONFIG_file }}
-          #make -j$(nproc --all) LLVM_IAS=1 LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out gki_defconfig all
-          make -j$(nproc --all) LLVM_IAS=1 LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out "$B_CONFIG" all
+          make -j$(nproc --all) LLVM_IAS=1 LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out gki_defconfig all
+          #make -j$(nproc --all) LLVM_IAS=1 LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out "$B_CONFIG" all
         else
           B_CONFIG=$ROOT/${{ inputs.BUILD_CONFIG_file }}
           sed -i 's/BUILD_SYSTEM_DLKM=1/BUILD_SYSTEM_DLKM=0/' ./$B_CONFIG
@@ -289,7 +289,7 @@ jobs:
         zip -r "$ZIP_NAME" ./*
         echo "ZIP_PATH=$GITHUB_WORKSPACE/AnyKernel3/$ZIP_NAME" >> $GITHUB_ENV
 
-    - name: ✅ Boot.img
+    - name: 🧠 Boot.img
       if: true
       run: |
         cd "android/out/android12-5.10/dist"
