@@ -3412,7 +3412,7 @@ index c6a2e1098..4f050cd0d 100644
 +		hymofs_post_getattr(path, inode, stat, err);
 +#endif
  		if (!err)
- 			susfs_generic_fillattr_spoofer(inode, stat);
+ 			susfs_sus_kstat_spoof_generic_fillattr(inode, stat);
  		return err;
  	}
  #else
