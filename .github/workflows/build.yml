@@ -477,7 +477,7 @@ jobs:
     - name: 🧠 Set Artifact Name
       id: set_name
       run: |
-        ARTIFACT_NAME="garnet-${{ inputs.MANIFEST_selection }}_${{ env.ANDROID_VERSION }}-${{ env.KERNEL_VERSION }}-${{ env.ACTUAL_SUBLEVEL }}"
+        ARTIFACT_NAME="garnet-${{ env.ANDROID_VERSION }}-${{ env.KERNEL_VERSION }}-${{ env.ACTUAL_SUBLEVEL }}"
         #if [ "${{ env.lz4kd }}" = "true" ]; then ARTIFACT_NAME="${ARTIFACT_NAME}_lz4kd"; fi
         ARTIFACT_NAME=${ARTIFACT_NAME}${{ env.NAME_INFO }}
         echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> $GITHUB_OUTPUT
