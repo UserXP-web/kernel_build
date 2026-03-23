@@ -392,7 +392,7 @@ jobs:
     - name: 📝 clang...
       run: |
         cd android/prebuilts-master/clang/host/linux-x86        
-        clangVersion=${{ inputs.clang_VERSION }} # r383902 r584948b
+        clangVersion=${{ inputs.clang_VERSION }} # r383902 r416183b r584948b --- r563880b
         clang_PATH="clang-$clangVersion"
         androidVersion="" # 12 or [empty]
         if [ "${clangVersion}" == "r383902" ]; then androidVersion='12'; fi        
