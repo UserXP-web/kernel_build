@@ -73,10 +73,10 @@ on:
         required: true
         default: 'Image'
       clang_VERSION:
-        description: 'clang [r383902, r416183b, r584948b]'
+        description: 'clang [r383902, r416183b, r563880b, r584948b]'
         type: string
         required: true
-        default: 'r584948b'
+        default: 'r563880b'
 
 jobs:
   build:
