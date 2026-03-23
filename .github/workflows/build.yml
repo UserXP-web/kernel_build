@@ -18,6 +18,9 @@ env:
   manifest_folder: 'common' # sm7435
   lz4kd: true
   ZIP_PATH: ''
+  KERNEL_VERSION: '5.10'
+  SUB_LEVEL: '236'
+  ANDROID_VERSION: 'android12'  
   
 on:
   workflow_dispatch:
@@ -42,7 +45,28 @@ on:
         description: 'Use Make as build method'
         type: boolean
         required: true
-        default: true
+        default: false
+
+      add_zeromount:
+        description: 'Add ZERoMount support (main)'
+        required: false
+        type: boolean
+        default: false
+      add_nomount:
+        description: 'Add NoMount support'
+        required: false
+        type: boolean
+        default: false
+      add_nomountX:
+        description: 'Add NoMount support (saved/old)'
+        required: false
+        type: boolean
+        default: false
+      add_hymofs:
+        description: 'Enable support for HymoFS'
+        required: false
+        type: boolean
+        default: false
         
       KERNEL_IMAGE_NAME:
         description: 'Image, Image.gz, Image.gz-dtb, etc.'
@@ -201,7 +225,170 @@ jobs:
         sed -i 's/check_defconfig//' ./$KERNEL_FOLDER/build.config.gki
         
         echo "✅ Kernel configuration update complete"
+
+    - name: Apply ZeroMount Patch
+      #if: inputs.add_zeromount && inputs.enable_susfs
+      if: inputs.add_zeromount
+      run: |
+        cd android/${{ env.manifest_folder }}
+        BRANCH="main" # main feature/patch-restructure
+        ANDROID_VERSION=${{ env.ANDROID_VERSION }}
+        KERNEL_VERSION=${{ env.KERNEL_VERSION }}
+        KERNEL_VARIANT="WildKSU" # ${{ inputs.ksu_variant }}
+        #echo "==> Apply Upstream SUSFS Patch"
+        #PATCHNAME=50_add_susfs_in_gki-$ANDROID_VERSION-$KERNEL_VERSION.patch
+        #curl -LSs "https://raw.githubusercontent.com/Enginex0/Super-Builders/refs/heads/$BRANCH/$ANDROID_VERSION-$KERNEL_VERSION/$KERNEL_VARIANT/patches/$PATCHNAME" -o $PATCHNAME
+        #patch -p1 -F3 --no-backup-if-mismatch < "$PATCHNAME"
+        #echo "==> Apply Enhanced SUSFS Patch"
+        #PATCHNAME=51_enhanced_susfs-$ANDROID_VERSION-$KERNEL_VERSION.patch
+        #curl -LSs "https://raw.githubusercontent.com/Enginex0/Super-Builders/refs/heads/$BRANCH/$ANDROID_VERSION-$KERNEL_VERSION/$KERNEL_VARIANT/patches/$PATCHNAME" -o $PATCHNAME
+        #patch -p1 -F3 --no-backup-if-mismatch < "$PATCHNAME"        
+        #echo "==> Apply KSU Safety Patch..."
+        #cd ../Wild_KSU
+        #PATCHNAME=70_ksu_safety-wksu-$KERNEL_VERSION.patch
+        #curl -LSs "https://raw.githubusercontent.com/Enginex0/Super-Builders/refs/heads/$BRANCH/$ANDROID_VERSION-$KERNEL_VERSION/$KERNEL_VARIANT/patches/$PATCHNAME" -o $PATCHNAME
+        #[ -s "$PATCHNAME" ] && patch -p1 --no-backup-if-mismatch < "$PATCHNAME" || echo "No 70_ patch needed"
+        #cd ../common
+
+        PATCHNAME=60_zeromount-$ANDROID_VERSION-$KERNEL_VERSION.patch          
+        curl -LSs "https://raw.githubusercontent.com/Enginex0/Super-Builders/refs/heads/$BRANCH/$ANDROID_VERSION-$KERNEL_VERSION/$KERNEL_VARIANT/patches/$PATCHNAME" -o $PATCHNAME
+        patch -p1 -F3 --no-backup-if-mismatch < "$PATCHNAME"
+    - name: NoMount
+      if: inputs.add_nomount || inputs.add_nomountX
+      run: |
+        echo ""
+        echo "=== NoMount patch ==="
+        cd android/${{ env.manifest_folder }}
+        #if [ "${{ inputs.enable_susfs }}" == "false" ]; then
+          NOMOUNT_PATCH="nomount-kernel-${{ inputs.kernel_version }}.patch"
+          echo "  no susfs: $NOMOUNT_PATCH"
+        #else            
+        #  NOMOUNT_PATCH="nomount-susfs-kernel-${{ inputs.kernel_version }}.patch"
+        #  echo "  with susfs: $NOMOUNT_PATCH"
+        #fi
+        if [ "${{ inputs.add_nomountX }}" == "true" ]; then
+          IS_X="X"
+          echo "  <> saved/old patch"
+          curl -LSs "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/patches/nomount/$NOMOUNT_PATCH" -o nomount.patch
+        else
+          IS_X=""
+          #if [ "${{ inputs.enable_susfs }}" == "false" ]; then
+            MASTER_EXP="master" # master experimental staging
+            echo "  <> LIVE/latest patch ($MASTER_EXP)"
+            curl -LSs "https://raw.githubusercontent.com/maxsteeel/nomount/refs/heads/$MASTER_EXP/patches/$NOMOUNT_PATCH" -o nomount.patch
+          #else
+          #  echo "  <> LIVE/latest patch (WITH EDITS by UserXP...)"
+          #  curl -LSs "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/patches/nomount/edit/$NOMOUNT_PATCH" -o nomount.patch
+          #fi
+        fi
+        chmod 777 nomount.patch
+        echo "Applying..."
+        patch -p1 --fuzz=10 < nomount.patch # > patch_nomount_log.txt 2>&1
+        #NOMOUNT_PATCH_EXIT_CODE=$?
+        #if [ $NOMOUNT_PATCH_EXIT_CODE -ne 0 ]; then
+        #  echo "ERROR nomount patch: $NOMOUNT_PATCH_EXIT_CODE"
+        #else
+        #NAME_INFO="${{ env.NAME_INFO }}_NoMount$IS_X"
+        #echo "${{ inputs.ksu_variant }} NAME_INFO=$NAME_INFO"
+        #echo "NAME_INFO=$NAME_INFO" >> $GITHUB_ENV
+        #fi
         
+    - name: HymoFS support
+      if: ${{ inputs.add_hymofs }}
+      #working-directory: ${{ env.KERNEL_ROOT }}/common
+      run: |
+        cd android/${{ env.manifest_folder }}
+        echo "[💠] Apply HymoFS"
+        #########cd "$CONFIG/common" # cd $KERNEL_DIR
+
+        # HymoFS One-Line Setup Script
+        # Usage: curl -LSs https://raw.githubusercontent.com/Anatdx/HymoFS/main/setup.sh | bash -s defconfig arch/arm64/configs/gki_defconfig with-susfs
+        #if [ "${{ inputs.enable_susfs }}" == "false" ]; then 
+          #curl -LSs https://raw.githubusercontent.com/Anatdx/HymoFS/main/setup.sh | bash -s defconfig arch/arm64/configs/gki_defconfig
+          curl -LSs https://raw.githubusercontent.com/UserXP-web/kernel_build/main/patches/hymofs/setup.sh | bash -s defconfig arch/arm64/configs/gki_defconfig
+        #else
+        #  #curl -LSs https://raw.githubusercontent.com/Anatdx/HymoFS/main/setup.sh | bash -s defconfig arch/arm64/configs/gki_defconfig
+        #  curl -LSs https://raw.githubusercontent.com/UserXP-web/kernel_build/main/patches/hymofs/setup.sh | bash -s defconfig arch/arm64/configs/gki_defconfig
+        #fi          
+        #patch -p1 --fuzz=3 < hymofs.patch # patch -p1 --fuzz=3 < hymofs.patch
+        echo "[✅] Done."
+
+    - name: NAME_INFO and Config
+      run: |
+        cd android
+        NAME_INFO="${{ env.NAME_INFO }}"
+        CONFIG_FILE="${{ env.manifest_folder }}/arch/arm64/configs/gki_defconfig" # "$DEFCONFIG"
+
+        #if [[ "${{ inputs.custom }}" == "true" ]]; then NAME_INFO="${NAME_INFO}_${{ inputs.custom_name }}"; fi
+        NAME_INFO="${NAME_INFO}_${{ inputs.MANIFEST_selection }}"
+        if [[ "${{ inputs.add_zeromount }}" == "true" ]]; then NAME_INFO="${NAME_INFO}_Zero"; fi
+        if [[ "${{ inputs.add_nomount }}" == "true" ]] || [[ "${{ inputs.add_nomountX }}" == "true" ]]; then
+          if [ "${{ inputs.add_nomountX }}" == "true" ]; then IS_X="X"; fi
+          NAME_INFO="${NAME_INFO}_NoMount$IS_X"
+          echo "CONFIG_NOMOUNT=y" >> "$CONFIG_FILE"
+        fi
+        if [[ "${{ inputs.add_hymofs }}" == "true" ]]; then NAME_INFO="${NAME_INFO}_hymofs"; fi
+ 
+        #if [ "${{ inputs.bypass_unicode }}" == "true" ]; then NAME_INFO="${NAME_INFO}_uni"; fi
+        #if [ "${{ inputs.enable_susfs }}" == "true" ]; then NAME_INFO="${NAME_INFO}_uni"; fi
+        if [ "${{ env.lz4kd }}" == "true" ]; then NAME_INFO="${NAME_INFO}_zram"; fi
+        #if [ "${{ env.WITH_BBG }}" == "y" ]; then NAME_INFO="${NAME_INFO}_bbg"; fi
+        #if [ "${{ inputs.use_bbg }}" == "true" ]; then NAME_INFO="${NAME_INFO}_bbg"; fi
+        #if [ "${{ inputs.use_kpm }}" == "true" ]; then NAME_INFO="${NAME_INFO}_kpm"; fi
+        #if [ "${{ inputs.enable_tmpfs }}" == "true" ]; then NAME_INFO="${NAME_INFO}_tmpfs"; fi
+        NAME_INFO="${NAME_INFO}_tmpfs"
+        #if [ "${{ env.WITH_SUSFS }}" == "y" ]; then NAME_INFO="${NAME_INFO}_susfs"; fi
+        #if [ "${{ inputs.enable_susfs }}" == "true" ]; then NAME_INFO="${NAME_INFO}_susfs"; fi
+        #if [ "${{ inputs.add_bypass }}" == "true" ]; then NAME_INFO="-Bypass${NAME_INFO}"; fi
+
+        NAME_INFO="${NAME_INFO}_$(date +'%d.%m.%y')"
+        echo "NAME_INFO=$NAME_INFO" >> $GITHUB_ENV
+        echo "^^^^^^^^^^^^^^^^^^^^^^ NAME_INFO=$NAME_INFO"
+
+        cat >> "$CONFIG_FILE" << 'EOF'
+        CONFIG_REKERNEL=y
+        CONFIG_REKERNEL_NETWORK=y
+        CONFIG_BPF_STREAM_PARSER=y		  
+        CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
+        CONFIG_NETFILTER_XT_SET=y
+        CONFIG_IP6_NF_NAT=y
+        CONFIG_IP6_NF_TARGET_MASQUERADE=y          
+        CONFIG_KSU_SUSFS_SUS_KSTAT_REDIRECT=y
+        CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
+        CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y   
+        # Optional kernel config placeholders
+        # Networking Configuration
+        CONFIG_IP_NF_TARGET_TTL=y
+        CONFIG_IP6_NF_TARGET_HL=y
+        CONFIG_IP6_NF_MATCH_HL=y   
+        # BBR TCP Congestion Control
+        CONFIG_TCP_CONG_ADVANCED=y
+        CONFIG_TCP_CONG_BBR=y
+        CONFIG_NET_SCH_FQ=y
+        # CONFIG_TCP_CONG_BIC is not set
+        # CONFIG_TCP_CONG_WESTWOOD is not set
+        # CONFIG_TCP_CONG_HTCP is not set   
+        # IPSet Support
+        CONFIG_IP_SET=y
+        CONFIG_IP_SET_MAX=65534
+        CONFIG_IP_SET_BITMAP_IP=y
+        CONFIG_IP_SET_BITMAP_IPMAC=y
+        CONFIG_IP_SET_BITMAP_PORT=y
+        CONFIG_IP_SET_HASH_IP=y
+        CONFIG_IP_SET_HASH_IPMARK=y
+        CONFIG_IP_SET_HASH_IPPORT=y
+        CONFIG_IP_SET_HASH_IPPORTIP=y
+        CONFIG_IP_SET_HASH_IPPORTNET=y
+        CONFIG_IP_SET_HASH_IPMAC=y
+        CONFIG_IP_SET_HASH_MAC=y
+        CONFIG_IP_SET_HASH_NETPORTNET=y
+        CONFIG_IP_SET_HASH_NET=y
+        CONFIG_IP_SET_HASH_NETNET=y
+        CONFIG_IP_SET_HASH_NETPORT=y
+        CONFIG_IP_SET_HASH_NETIFACE=y
+        CONFIG_IP_SET_LIST_SET=y
+        EOF
+
     - name: 📝 clang...
       run: |
         cd android/prebuilts-master/clang/host/linux-x86        
@@ -231,6 +418,16 @@ jobs:
       run: |
         SUB_DIR=${{ env.manifest_folder }}
         curl -LSs "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/correct/bootconfig.c" -o ./android/$SUB_DIR/fs/proc/bootconfig.c
+
+    - name: Extract the actual sub-version number
+      run: |
+        ACTUAL_SUBLEVEL="${{ env.SUB_LEVEL }}"
+        if [[ -f "$GITHUB_WORKSPACE/android/${{ env.manifest_folder }}/Makefile" ]]; then
+          EXTRACTED=$(grep '^SUBLEVEL = ' "$GITHUB_WORKSPACE/android/${{ env.manifest_folder }}/Makefile" | awk '{print $3}')
+          [[ -n "$EXTRACTED" ]] && ACTUAL_SUBLEVEL="$EXTRACTED"
+        fi
+        echo "ACTUAL_SUBLEVEL=$ACTUAL_SUBLEVEL" >> $GITHUB_ENV
+        echo "Actual sub-version number: $ACTUAL_SUBLEVEL"
         
     - name: 🔨 Build Kernel
       run: |
@@ -279,8 +476,9 @@ jobs:
     - name: 🧠 Set Artifact Name
       id: set_name
       run: |
-        ARTIFACT_NAME="garnet-${{ inputs.MANIFEST_selection }}_android12-5.10-236"
-        if [ "${{ env.lz4kd }}" = "true" ]; then ARTIFACT_NAME="${ARTIFACT_NAME}_lz4kd"; fi
+        ARTIFACT_NAME="garnet-${{ inputs.MANIFEST_selection }}_${{ env.ANDROID_VERSION }}-${{ env.KERNEL_VERSION }}-${{ env.ACTUAL_SUBLEVEL }}"
+        #if [ "${{ env.lz4kd }}" = "true" ]; then ARTIFACT_NAME="${ARTIFACT_NAME}_lz4kd"; fi
+        ARTIFACT_NAME=${ARTIFACT_NAME}${{ env.NAME_INFO }}
         echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> $GITHUB_OUTPUT
         
     - name: 📦 Package kernel
