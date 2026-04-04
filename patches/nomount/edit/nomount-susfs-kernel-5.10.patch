@@ -1562,17 +1562,18 @@ index a21875ca3..f89b58bf8 100644
  static int flags_by_mnt(int mnt_flags)
  {
  	int flags = 0;
-@@ -100,11 +104,21 @@ int vfs_statfs(const struct path *path, struct kstatfs *buf)
- 	error = statfs_by_dentry(mnt->mnt.mnt_root, buf);
- 	if (!error)
- 		buf->f_flags = calculate_f_flags(&mnt->mnt);
+@@ -126,6 +126,10 @@ int vfs_statfs(const struct path *path, struct kstatfs *buf)
+ 		error = statfs_by_dentry(no_sus_vfsmnt->mnt_root, buf);
+ 		if (!error)
+ 			buf->f_flags = calculate_f_flags(no_sus_vfsmnt);
 +#ifdef CONFIG_NOMOUNT
-+	if (!nomount_should_skip())
-+		nomount_spoof_statfs(path, buf);
++		if (!nomount_should_skip())
++			nomount_spoof_statfs(path, buf);
 +#endif
-+
- 	return error;
- #else
+ 		dput(no_sus_vfsmnt->mnt_root);
+ 		mntput(no_sus_vfsmnt);
+ 		return error;
+@@ -139,6 +143,10 @@ int vfs_statfs(const struct path *path, struct kstatfs *buf)
  	error = statfs_by_dentry(path->dentry, buf);
  	if (!error)
  		buf->f_flags = calculate_f_flags(path->mnt);
@@ -1580,10 +1581,9 @@ index a21875ca3..f89b58bf8 100644
 +	if (!nomount_should_skip())
 +		nomount_spoof_statfs(path, buf);
 +#endif
-+
  	return error;
- #endif
  }
+ EXPORT_SYMBOL(vfs_statfs);
 diff --git a/fs/xattr.c b/fs/xattr.c
 index 8d7151492..77c6f8537 100644
 --- a/fs/xattr.c
