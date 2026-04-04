@@ -180,16 +180,16 @@ index c55ec2d32..1ee065f1b 100644
  	filp = path_openat(&nd, op, flags | LOOKUP_RCU);
  	if (unlikely(filp == ERR_PTR(-ECHILD)))
  		filp = path_openat(&nd, op, flags);
-@@ -3697,12 +3765,16 @@ struct file *do_filp_open(int dfd, struct filename *pathname,
+@@ -3741,6 +3741,10 @@ struct file *do_filp_open(int dfd, struct filename *pathname,
  	if (unlikely(filp == ERR_PTR(-ESTALE)))
  		filp = path_openat(&nd, op, flags | LOOKUP_REVAL);
  	restore_nameidata();
 +#ifdef CONFIG_NOMOUNT
-+    		if (nm_name != pathname)
-+        		putname(nm_name);
++	if (nm_name != pathname)
++		putname(nm_name);
 +#endif
  	return filp;
- 	}
+ }
  
 diff --git a/fs/nomount.c b/fs/nomount.c
 new file mode 100644
