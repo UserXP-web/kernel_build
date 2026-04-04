@@ -1516,36 +1516,34 @@ index f0a1f2369..21c432b8e 100644
  
  	memset(stat, 0, sizeof(*stat));
  	stat->result_mask |= STATX_BASIC_STATS;
-@@ -111,11 +116,24 @@ int vfs_getattr_nosec(const struct path *path, struct kstat *stat,
-	{
-		int err = inode->i_op->getattr(path, stat, request_mask,
-					    query_flags);
+@@ -115,16 +115,29 @@ int vfs_getattr_nosec(const struct path *path, struct kstat *stat,
+ 	{
+ 		int err = inode->i_op->getattr(path, stat, request_mask,
+ 					    query_flags);
 +#ifdef CONFIG_NOMOUNT
 +        if (err == 0 && !nomount_should_skip())
 +            nomount_spoof_stat(path, stat);
 +#endif
-		if (!err)
-			susfs_sus_kstat_spoof_generic_fillattr(inode, stat);
-		return err;
-	}
+ 		if (!err)
+ 			susfs_sus_kstat_spoof_generic_fillattr(inode, stat);
+ 		return err;
+ 	}
  #else
 -		return inode->i_op->getattr(path, stat, request_mask,
 +		ret = inode->i_op->getattr(path, stat, request_mask,
-					    query_flags);
+ 					    query_flags);
 +#ifdef CONFIG_NOMOUNT
-+       if (ret == 0 && !nomount_should_skip())
-+       	nomount_spoof_stat(path, stat);
++        if (ret == 0 && !nomount_should_skip())
++            nomount_spoof_stat(path, stat);
 +#endif
 +		return ret;
  #endif
-
+ 
  	generic_fillattr(inode, stat);
-+
 +#ifdef CONFIG_NOMOUNT
 +    if (!nomount_should_skip())
 +    	nomount_spoof_stat(path, stat);
 +#endif
-+
  	return 0;
  }
  EXPORT_SYMBOL(vfs_getattr_nosec);
