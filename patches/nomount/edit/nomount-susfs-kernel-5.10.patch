@@ -1512,7 +1512,7 @@ index f0a1f2369..21c432b8e 100644
  		      u32 request_mask, unsigned int query_flags)
  {
  	struct inode *inode = d_backing_inode(path->dentry);
-+	int ret = 0;
++	// int ret = 0;
  
  	memset(stat, 0, sizeof(*stat));
  	stat->result_mask |= STATX_BASIC_STATS;
