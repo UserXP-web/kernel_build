@@ -126,6 +126,10 @@ int vfs_statfs(const struct path *path, struct kstatfs *buf)
 		error = statfs_by_dentry(no_sus_vfsmnt->mnt_root, buf);
 		if (!error)
 			buf->f_flags = calculate_f_flags(no_sus_vfsmnt);
+#ifdef CONFIG_NOMOUNT
+		if (!nomount_should_skip())
+			nomount_spoof_statfs(path, buf);
+#endif
 		dput(no_sus_vfsmnt->mnt_root);
 		mntput(no_sus_vfsmnt);
 		return error;
@@ -139,6 +143,10 @@ orig_flow:
 	error = statfs_by_dentry(path->dentry, buf);
 	if (!error)
 		buf->f_flags = calculate_f_flags(path->mnt);
+#ifdef CONFIG_NOMOUNT
+	if (!nomount_should_skip())
+		nomount_spoof_statfs(path, buf);
+#endif
 	return error;
 }
 EXPORT_SYMBOL(vfs_statfs);
