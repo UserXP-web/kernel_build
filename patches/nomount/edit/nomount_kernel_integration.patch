@@ -129,7 +129,7 @@ index 1438eb643..0d2ee2f35 100644
  static long do_faccessat(int dfd, const char __user *filename, int mode, int flags)
  {
  	struct path path;
-@@ -403,6 +410,12 @@ static long do_faccessat(int dfd, const char __user *filename, int mode, int fla
+@@ -403,6 +410,14 @@ static long do_faccessat(int dfd, const char __user *filename, int mode, int fla
  	unsigned int lookup_flags = LOOKUP_FOLLOW;
  	const struct cred *old_cred = NULL;
  
