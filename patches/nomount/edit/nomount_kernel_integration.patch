@@ -134,7 +134,7 @@ index 1438eb643..0d2ee2f35 100644
  	const struct cred *old_cred = NULL;
  
 +#ifdef CONFIG_NOMOUNT
-+	if (1 == 1) {
++	if (true) {
 +		long nm_res = 0L;
 +		if (nomount_handle_faccessat(dfd, filename, mode, lookup_flags, &nm_res))
 +			return nm_res;
