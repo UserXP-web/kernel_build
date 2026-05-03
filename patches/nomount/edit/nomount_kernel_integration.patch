@@ -127,16 +127,18 @@ index 1438eb643..fcd271b5c 100644
  int do_truncate(struct dentry *dentry, loff_t length, unsigned int time_attrs,
  	struct file *filp)
  {
-@@ -420,6 +425,15 @@ static long do_faccessat(int dfd, const char __user *filename, int mode, int fla
+@@ -420,6 +425,17 @@ static long do_faccessat(int dfd, const char __user *filename, int mode, int fla
  			return -ENOMEM;
  	}
  
 +#ifdef CONFIG_NOMOUNT
-+	long nm_res;
-+	if (nomount_handle_faccessat(dfd, filename, mode, lookup_flags, &nm_res)) {
-+		revert_creds(old_cred);
-+		put_cred(override_cred);
-+		return nm_res;
++	if (true) {
++		long nm_res;
++		if (nomount_handle_faccessat(dfd, filename, mode, lookup_flags, &nm_res)) {
++			revert_creds(old_cred);
++			/* put_cred(override_cred); */
++			return nm_res;
++		}
 +	}
 +#endif
 +
