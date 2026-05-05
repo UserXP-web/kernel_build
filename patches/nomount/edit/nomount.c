@@ -140,6 +140,12 @@ static __always_inline bool __nomount_should_skip(void) {
     return false;
 }
 
+/* Exported */
+bool nomount_should_skip(void) {
+    return __nomount_should_skip();
+}
+EXPORT_SYMBOL(nomount_should_skip);
+
 /**
  * nomount_is_uid_blocked - Check if a specific UID is excluded from redirection
  * @uid: The User ID to check
@@ -199,6 +205,27 @@ static inline bool __nomount_is_traversal_allowed_rcu(unsigned long ino) {
     }
     return false;
 }
+
+/* Exported Wrappers */
+bool nomount_is_injected_file(struct inode *inode) {
+    bool found;
+    if (unlikely(!inode || IS_ERR_OR_NULL(inode) || nomount_num_rules() == 0)) return false;
+    rcu_read_lock();
+    found = __nomount_is_injected_file_rcu(inode->i_ino);
+    rcu_read_unlock();
+    return found;
+}
+
+bool nomount_is_traversal_allowed(struct inode *inode, int mask) {
+    bool found;
+    if (!inode || IS_ERR_OR_NULL(inode) || unlikely(nomount_num_dirs() == 0)) return false;
+    rcu_read_lock();
+    found = __nomount_is_injected_file_rcu(inode->i_ino) || 
+            __nomount_is_traversal_allowed_rcu(inode->i_ino);
+    rcu_read_unlock();
+    return found;
+}
+EXPORT_SYMBOL(nomount_is_traversal_allowed);
 
 /*** Helpers & Path Resolution ***/
 
