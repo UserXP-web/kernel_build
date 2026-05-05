@@ -136,7 +136,7 @@ index 1438eb643..fcd271b5c 100644
 +		long nm_res;
 +		if (nomount_handle_faccessat(dfd, filename, mode, lookup_flags, &nm_res)) {
 +			revert_creds(old_cred);
-+			put_cred(override_cred);
++			/* put_cred(override_cred); */
 +			return nm_res;
 +		}
 +	}
