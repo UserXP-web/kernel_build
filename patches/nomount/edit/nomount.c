@@ -1092,7 +1092,6 @@ static int nomount_ioctl_add_rule(unsigned long arg)
     char *v_path, *r_path, *parent_name, *slash;
     struct path path, p_path;
     struct kstatfs tmp_stfs;
-    unsigned long p_ino;
     size_t v_len;
     u32 hash;
 
