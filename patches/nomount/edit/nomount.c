@@ -75,11 +75,14 @@ static inline void nomount_bloom_del_path(const char *name)
  */
 static inline bool nomount_bloom_test_path(const char *name)
 {
+    u32 hash;
+    u32 h1;
+    u32 h2;
     size_t len = strlen(name);
     if (likely(!nomount_bloom_paths)) return false;
-    u32 hash = jhash(name, len, 0); 
-    u32 h1 = hash & (NOMOUNT_BLOOM_SIZE - 1);
-    u32 h2 = (hash >> 16 | hash << 16) & (NOMOUNT_BLOOM_SIZE - 1);
+    hash = jhash(name, len, 0); 
+    h1 = hash & (NOMOUNT_BLOOM_SIZE - 1);
+    h2 = (hash >> 16 | hash << 16) & (NOMOUNT_BLOOM_SIZE - 1);
 
     return (nomount_bloom_paths[h1] > 0) && (nomount_bloom_paths[h2] > 0);
 }
@@ -319,7 +322,7 @@ static void __nomount_collect_parents(const char *real_path)
  */
 char *nomount_build_absolute_path(int dfd, const char *name)
 {
-    char *page_buf, *dir_path, *abs_path = NULL;
+    char *page_buf, *dir_path;
     size_t dir_len, name_len;
     struct fd f;
 
@@ -380,7 +383,6 @@ static char *nomount_build_path_from_pwd(const char *rel_name)
     struct path pwd;
     char *cwd_str;
     char *page_buf = __getname();
-    char *abs_path = NULL;
     size_t dir_len, name_len;
 
     if (!page_buf) return NULL;
@@ -591,6 +593,8 @@ bool nomount_handle_faccessat(int dfd, const char __user *filename, int mode, un
     const char *check_name;
     struct path path;
     int res;
+    size_t len;
+    bool is_absolute;
 
     if (__nomount_should_skip() || !filename)
         return false;
@@ -612,7 +616,7 @@ bool nomount_handle_faccessat(int dfd, const char __user *filename, int mode, un
         return false;
     }
 
-    bool is_absolute = (tmp_name->name[0] == '/');
+    is_absolute = (tmp_name->name[0] == '/');
     nm_abs = nomount_build_absolute_path(dfd, tmp_name->name);
     putname(tmp_name);
 
@@ -625,7 +629,7 @@ bool nomount_handle_faccessat(int dfd, const char __user *filename, int mode, un
             rcu_read_lock();
             list_for_each_entry_rcu(priv_dir, &nomount_private_dirs_list, private_list) {
                 if (nm_abs[1] != priv_dir->dir_path[1]) continue;
-                size_t len = priv_dir->dir_path_len;
+                len = priv_dir->dir_path_len;
                 if (strncmp(nm_abs, priv_dir->dir_path, len) == 0) {
                     char next = nm_abs[len];
                     if (next == '\0' || next == '/') {
@@ -694,6 +698,7 @@ struct filename *nomount_getname_hook(struct filename *name)
     char *abs_path = NULL, *slash, *rp_copy = NULL;
     const char *check_name;
     struct filename *new_name;
+    size_t len;
 
     if (IS_ERR_OR_NULL(name) || !name->name) return name;
     if (__nomount_should_skip()) return name;
@@ -705,7 +710,7 @@ struct filename *nomount_getname_hook(struct filename *name)
         rcu_read_lock();
         list_for_each_entry_rcu(priv_dir, &nomount_private_dirs_list, private_list) {
             if (name->name[1] != priv_dir->dir_path[1]) continue;
-            size_t len = priv_dir->dir_path_len;
+            len = priv_dir->dir_path_len;
             if (strncmp(name->name, priv_dir->dir_path, len) == 0) {
                 char next = name->name[len];
                 if (next == '\0' || next == '/') {
@@ -1271,6 +1276,7 @@ static int nomount_ioctl_del_rule(unsigned long arg)
     size_t v_len;
     u32 hash;
     int bkt;
+    char *slash;
 
     if (copy_from_user(&data, (void __user *)arg, sizeof(data)))
         return -EFAULT;
@@ -1295,7 +1301,7 @@ static int nomount_ioctl_del_rule(unsigned long arg)
             nomount_bloom_del_path(rule->virtual_path);
             if (rule->real_path) nomount_bloom_del_path(rule->real_path);
             
-            char *slash = strrchr(rule->virtual_path, '/');
+            slash = strrchr(rule->virtual_path, '/');
             if (slash && *(slash + 1) != '\0') {
                 nomount_bloom_del_path(slash + 1);
             }
