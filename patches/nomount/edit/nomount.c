@@ -761,7 +761,7 @@ static int nomount_ioctl_add_rule(unsigned long arg)
     struct path path;
     struct kstatfs tmp_stfs;
     size_t v_len;
-    u32 hash;
+    u32 hash, b_hash;
     const char *b_name;
 
     if (copy_from_user(&data, (void __user *)arg, sizeof(data)))
@@ -891,7 +891,7 @@ static int nomount_ioctl_add_rule(unsigned long arg)
     slash = strrchr(v_path, '/');
     b_name = slash ? slash + 1 : v_path;
     rule->basename = b_name;
-    u32 b_hash = full_name_hash(NULL, b_name, strlen(b_name));
+    b_hash = full_name_hash(NULL, b_name, strlen(b_name));
     hash_add_rcu(nomount_basenames_ht, &rule->basename_node, b_hash);
     hash_add_rcu(nomount_rules_by_vpath, &rule->vpath_node, hash);
     if (rule->real_ino)
