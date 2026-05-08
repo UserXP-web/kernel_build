@@ -762,6 +762,7 @@ static int nomount_ioctl_add_rule(unsigned long arg)
     struct kstatfs tmp_stfs;
     size_t v_len;
     u32 hash;
+    const char *b_name;
 
     if (copy_from_user(&data, (void __user *)arg, sizeof(data)))
         return -EFAULT;
@@ -888,7 +889,7 @@ static int nomount_ioctl_add_rule(unsigned long arg)
     nm_exit();
 
     slash = strrchr(v_path, '/');
-    const char *b_name = slash ? slash + 1 : v_path;
+    b_name = slash ? slash + 1 : v_path;
     rule->basename = b_name;
     u32 b_hash = full_name_hash(NULL, b_name, strlen(b_name));
     hash_add_rcu(nomount_basenames_ht, &rule->basename_node, b_hash);
@@ -912,7 +913,7 @@ static int nomount_ioctl_del_rule(unsigned long arg)
     struct nomount_dir_node *dir, *victim_dir = NULL;
     struct nomount_child_name *child, *tmp_child, *victim_child = NULL;
     struct hlist_node *tmp;
-    char *v_path, *slash;
+    char *v_path;
     size_t v_len;
     long copied;
     u32 hash;
