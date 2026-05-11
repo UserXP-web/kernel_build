@@ -418,6 +418,8 @@ struct filename *nomount_getname_hook(struct filename *name)
 
     if (IS_ERR_OR_NULL(name) || !name->name) return name;
     if (__nomount_should_skip()) return name;
+    if (unlikely(name->name[0] == '/' && name->name[1] == '\0'))
+        return name;
 
     if (current_uid().val != 0 && nomount_num_dirs() != 0 && !list_empty(&nomount_private_dirs_list)) {
         struct nomount_dir_node *priv_dir;
