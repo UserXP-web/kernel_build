@@ -6,7 +6,6 @@
 #include <linux/uaccess.h>
 #include <linux/miscdevice.h>
 #include <linux/cred.h>
-#include <linux/mm.h>
 #include <linux/statfs.h>
 #include <linux/fs_struct.h>
 #include "nomount.h"
@@ -17,32 +16,13 @@ atomic_t nm_active_dirs = ATOMIC_INIT(0);
 #define nomount_num_rules() atomic_read(&nm_active_rules)
 #define nomount_num_dirs() atomic_read(&nm_active_dirs)
 
+/* logs */
+#define nm_debug(fmt, ...) printk(KERN_DEBUG "NoMount: [DEBUG] " fmt, ##__VA_ARGS__)
+#define nm_info(fmt, ...) printk(KERN_INFO "NoMount: " fmt, ##__VA_ARGS__)
+#define nm_warn(fmt, ...) printk(KERN_WARNING "NoMount: [WARN] " fmt, ##__VA_ARGS__)
+#define nm_err(fmt, ...)  printk(KERN_ERR "NoMount: [ERROR] " fmt, ##__VA_ARGS__)
+
 /*** Verification & Compatibility Checks ***/
-
-/* Forward declaration */
-bool nomount_is_uid_blocked(uid_t uid);
-
-/**
- * __nomount_should_skip - Determine if the current context should bypass hooks
- *
- * Returns true if NoMount is disabled, if running in interrupt context,
- * if recursion is detected, or if the current UID is in the blocklist.
- */
-static __always_inline bool __nomount_should_skip(void) {
-    if (unlikely(!in_task() || in_nmi() || oops_in_progress)) return true;
-    if (unlikely(nm_is_recursive())) return true;
-    if (unlikely(current->flags & (PF_KTHREAD | PF_EXITING))) return true;
-    if (unlikely(!hash_empty(nomount_uid_ht))) {
-        if (unlikely(nomount_is_uid_blocked(current_uid().val))) return true;
-    }
-    return false;
-}
-
-/* Exported */
-bool nomount_should_skip(void) {
-    return __nomount_should_skip();
-}
-EXPORT_SYMBOL(nomount_should_skip);
 
 /**
  * nomount_is_uid_blocked - Check if a specific UID is excluded from redirection
@@ -62,6 +42,29 @@ bool nomount_is_uid_blocked(uid_t uid) {
     rcu_read_unlock();
     return false;
 }
+
+/**
+ * __nomount_should_skip - Determine if the current context should bypass hooks
+ *
+ * Returns true if NoMount is disabled, if running in interrupt context,
+ * if recursion is detected, or if the current UID is in the blocklist.
+ */
+static __always_inline bool __nomount_should_skip(void) {
+    if (unlikely(!in_task() || in_nmi() || oops_in_progress)) return true;
+    if (unlikely(nm_is_recursive())) return true;
+    if (unlikely(current->flags & (PF_KTHREAD | PF_EXITING))) return true;
+    if (unlikely(!hash_empty(nomount_uid_ht))) {
+        if (unlikely(nomount_is_uid_blocked(current_uid().val))) return true;
+    }
+    return false;
+}
+
+/* Exported */
+bool nomount_should_skip(void) {
+    if (unlikely(nomount_num_dirs() == 0)) return true;
+    return __nomount_should_skip();
+}
+EXPORT_SYMBOL(nomount_should_skip);
 
 /**
  * __nomount_is_injected_file_rcu - Check if an inode number belongs to an injected file.
@@ -188,7 +191,7 @@ static void __nomount_collect_parents(const char *real_path, size_t len)
                         INIT_LIST_HEAD(&dir_node->children_names);
                         hash_add_rcu(nomount_dirs_ht, &dir_node->node, p_ino);
                         if (priv) {
-                            dir_node->dir_path_len = strlen(p);
+                            dir_node->dir_path_len = slash - p;
                             dir_node->dir_path = kmalloc(dir_node->dir_path_len + 1, GFP_KERNEL);
                             if (dir_node->dir_path) {
                                 memcpy(dir_node->dir_path, p, dir_node->dir_path_len + 1);
@@ -219,12 +222,12 @@ static void __nomount_collect_parents(const char *real_path, size_t len)
  * Returns an __getname() buffer containing the absolute path, or NULL on failure.
  * Caller must free the returned buffer using __putname().
  */
-static char *nomount_build_path_from_pwd(const char *rel_name) 
+static char *nomount_build_path_from_pwd(const char *rel_name, size_t name_len, size_t *out_len) 
 {
     struct path pwd;
     char *cwd_str;
     char *page_buf = __getname();
-    size_t dir_len, name_len;
+    size_t dir_len;
 
     if (!page_buf) return NULL;
 
@@ -237,21 +240,24 @@ static char *nomount_build_path_from_pwd(const char *rel_name)
         return NULL;
     }
 
-    dir_len = strlen(cwd_str);
-    name_len = strlen(rel_name);
+    dir_len = (page_buf + PATH_MAX - 1) - cwd_str;
 
     if (likely(dir_len + name_len + 2 <= PATH_MAX)) {
         memmove(page_buf, cwd_str, dir_len);
 
-        if (dir_len > 0 && cwd_str[dir_len - 1] != '/') {
+        if (dir_len > 0 && page_buf[dir_len - 1] != '/') {
             page_buf[dir_len] = '/';
             memcpy(page_buf + dir_len + 1, rel_name, name_len + 1);
+            if (out_len) *out_len = dir_len + 1 + name_len;
         } else {
             memcpy(page_buf + dir_len, rel_name, name_len + 1);
+            if (out_len) *out_len = dir_len + name_len;
         }
+        return page_buf;
     }
 
-    return page_buf;
+    __putname(page_buf);
+    return NULL;
 }
 
 /**
@@ -409,16 +415,24 @@ int nomount_allow_access(struct inode *inode, int mask)
 struct filename *nomount_getname_hook(struct filename *name)
 {
     struct nomount_rule *rule;
-    char *abs_path = NULL, *slash, *rp_copy = NULL;
+    char *abs_path = NULL, *rp_copy = NULL;
     const char *check_name;
-    size_t b_len, r_len;
+    const char *s, *last_slash = NULL;
+    size_t name_len = 0, b_len, r_len;
     struct filename *new_name;
     bool basename_match;
     u32 b_hash;
 
     if (IS_ERR_OR_NULL(name) || !name->name) return name;
     if (__nomount_should_skip()) return name;
-    if (unlikely(name->name[0] == '/' && name->name[1] == '\0'))
+
+    s = name->name;
+    while (*s) {
+        if (*s == '/') last_slash = s;
+        s++; name_len++;
+    }
+
+    if (unlikely(name_len == 1 && name->name[0] == '/'))
         return name;
 
     if (current_uid().val != 0 && nomount_num_dirs() != 0 && !list_empty(&nomount_private_dirs_list)) {
@@ -448,18 +462,20 @@ struct filename *nomount_getname_hook(struct filename *name)
     if (unlikely(nomount_num_rules() == 0))
         return name;
 
-    check_name = name->name;
-    slash = strrchr(check_name, '/');
-    if (slash && *(slash + 1) != '\0') {
-        check_name = slash + 1;
+    if (last_slash && *(last_slash + 1) != '\0') {
+        check_name = last_slash + 1;
+        b_len = s - check_name;
+    } else {
+        check_name = name->name;
+        b_len = name_len;
     }
-    b_len = strlen(check_name);
+
     b_hash = full_name_hash(NULL, check_name, b_len);
     basename_match = false;
 
     rcu_read_lock();
     hash_for_each_possible_rcu(nomount_basenames_ht, rule, basename_node, b_hash) {
-        if (rule->b_len == b_len && memcmp(rule->basename, check_name, b_len) == 0) {
+        if (rule->b_len == b_len && memcmp(rule->basename, check_name, b_len) == 0) { 
             basename_match = true;
             break;
         }
@@ -469,13 +485,15 @@ struct filename *nomount_getname_hook(struct filename *name)
     if (!basename_match) return name; 
 
     if (name->name[0] != '/') {
-        abs_path = nomount_build_path_from_pwd(name->name);
-        if (!abs_path) return name;
+        abs_path = nomount_build_path_from_pwd(name->name, name_len, &r_len);
+        if (!abs_path) {
+            nm_debug("Failed to construct absolute path for relative target: %s\n", name->name);
+            return name;
+        }
         check_name = abs_path;
-        r_len = strlen(abs_path);
     } else {
         check_name = name->name;
-        r_len = strlen(check_name);
+        r_len = name_len;
     }
 
     rp_copy = __getname();
@@ -502,6 +520,7 @@ struct filename *nomount_getname_hook(struct filename *name)
             new_name->uptr = name->uptr;
             new_name->aname = name->aname;
             putname(name);
+            nm_debug("Redirected: %s -> %s\n", check_name, rule->real_path);
             return new_name;
         }
     }
@@ -565,6 +584,9 @@ found:
         local_ino = child->fake_ino;
         local_type = child->d_type;
         rcu_read_unlock();
+
+        nm_debug("Injected virtual entry '%s' (ino: %lu) into dir ino %lu\n", 
+                 local_name, local_ino, dir_inode->i_ino);
 
         if (!dir_emit(ctx, local_name, local_len, local_ino, local_type)) {
             nm_exit();
@@ -639,6 +661,223 @@ static void __nomount_auto_inject_parent(unsigned long parent_ino, const char *n
     }
 }
 
+/**
+ * nomount_generate_virtual_topology - Autogenerates intermediate directory rules
+ * @rule: The main rule being added
+ * @v_path: Virtual path string
+ * @r_path: Real path string
+ * @v_len: Length of virtual path
+ * @flags: Original IOCTL flags
+ *
+ * Walks the path backwards using in-place mutation to find the closest
+ * native parent, inherits its metadata (s_dev, s_magic), and auto-injects
+ * intermediate virtual directory rules to satisfy VFS lookups.
+ *
+ * Returns 0 on success, or negative error code (e.g., -ENOMEM) on failure.
+ */
+static int nomount_generate_virtual_topology(struct nomount_rule *rule, 
+                                             const char *v_path, const char *r_path, 
+                                             size_t v_len, int flags)
+{
+    char *tmp_v, *tmp_r;
+    int err = 0;
+    int child_len, cur_v_len, cur_r_len, current_flags;
+    struct nomount_rule *pending_rules[32];
+    char *slashes_v[32];
+    char *slashes_r[32];
+    int p_count = 0;
+    unsigned long inherited_dev = 0;
+    unsigned long inherited_fs_type = 0;
+
+    nm_debug("Virtual path %s not present natively, generating virtual topology\n", v_path);
+
+    tmp_v = __getname();
+    tmp_r = __getname();
+    if (!tmp_v || !tmp_r) {
+        if (tmp_v) __putname(tmp_v);
+        if (tmp_r) __putname(tmp_r);
+        return -ENOMEM;
+    }
+
+    memcpy(tmp_v, v_path, v_len + 1);
+    memcpy(tmp_r, r_path, rule->rp_len + 1);
+    
+    child_len = v_len;
+    cur_v_len = v_len;
+    cur_r_len = rule->rp_len;
+    current_flags = flags;
+
+    while (p_count < 32) {
+        char *slash_v, *slash_r;
+        struct path p_path;
+        unsigned long current_parent_ino;
+
+        slash_v = strrchr(tmp_v, '/');
+        slash_r = strrchr(tmp_r, '/');
+
+        if (!slash_v || slash_v == tmp_v) {
+            if (kern_path("/", LOOKUP_FOLLOW, &p_path) == 0) {
+                current_parent_ino = d_backing_inode(p_path.dentry)->i_ino;
+                __nomount_auto_inject_parent(current_parent_ino, tmp_v + 1, 
+                    (current_flags & NM_FLAG_IS_DIR) ? DT_DIR : DT_REG,
+                    full_name_hash(NULL, rule->virtual_path, child_len));
+                path_put(&p_path);
+            }
+            break;
+        }
+
+        *slash_v = '\0';
+        slashes_v[p_count] = slash_v;
+        cur_v_len = slash_v - tmp_v;
+
+        if (slash_r && slash_r != tmp_r) {
+            *slash_r = '\0';
+            slashes_r[p_count] = slash_r;
+            cur_r_len = slash_r - tmp_r;
+        } else {
+            slashes_r[p_count] = NULL;
+            tmp_r = NULL;
+        }
+
+        pending_rules[p_count] = NULL; 
+        p_count++;
+
+        if (kern_path(tmp_v, LOOKUP_FOLLOW, &p_path) == 0) {
+            inherited_dev = p_path.dentry->d_sb->s_dev;
+            if (p_path.dentry->d_sb->s_op->statfs) {
+                struct kstatfs st;
+                p_path.dentry->d_sb->s_op->statfs(p_path.dentry, &st);
+                inherited_fs_type = st.f_type;
+            } else {
+                inherited_fs_type = p_path.dentry->d_sb->s_magic;
+            }
+            current_parent_ino = d_backing_inode(p_path.dentry)->i_ino;
+            __nomount_auto_inject_parent(current_parent_ino, slash_v + 1, 
+                (current_flags & NM_FLAG_IS_DIR) ? DT_DIR : DT_REG,
+                full_name_hash(NULL, rule->virtual_path, child_len));
+            path_put(&p_path);
+            break; 
+        } else {
+            u32 h_inter;
+            bool inter_exists;
+            struct nomount_rule *ex;
+
+            current_parent_ino = (unsigned long)full_name_hash(NULL, tmp_v, cur_v_len);
+            __nomount_auto_inject_parent(current_parent_ino, slash_v + 1, 
+                (current_flags & NM_FLAG_IS_DIR) ? DT_DIR : DT_REG, full_name_hash(NULL, rule->virtual_path, child_len));
+
+            h_inter = full_name_hash(NULL, tmp_v, cur_v_len);
+            inter_exists = false;
+            
+            hash_for_each_possible(nomount_rules_by_vpath, ex, vpath_node, h_inter) {
+                if (ex->vp_len == cur_v_len && memcmp(ex->virtual_path, tmp_v, cur_v_len) == 0) {
+                    inherited_dev = ex->v_dev;
+                    inherited_fs_type = ex->v_fs_type;
+                    inter_exists = true;
+                    break;
+                }
+            }
+
+            if (!inter_exists) {
+                pending_rules[p_count - 1] = kmem_cache_zalloc(nm_rule_cachep, GFP_KERNEL);
+                if (!pending_rules[p_count - 1]) {
+                    err = -ENOMEM;
+                    break;
+                }
+
+                {
+                    struct nomount_rule *irule = pending_rules[p_count - 1];
+                    char *b_slash;
+                    const char *b_name_inter;
+
+                    irule->virtual_path = kstrdup(tmp_v, GFP_KERNEL);
+                    irule->real_path = tmp_r ? kstrdup(tmp_r, GFP_KERNEL) : kstrdup("/", GFP_KERNEL);
+
+                    if (!irule->virtual_path || !irule->real_path) {
+                        if (irule->virtual_path) kfree(irule->virtual_path);
+                        if (irule->real_path) kfree(irule->real_path);
+                        kmem_cache_free(nm_rule_cachep, irule);
+                        pending_rules[p_count - 1] = NULL;
+                        err = -ENOMEM;
+                        break;
+                    }
+
+                    irule->vp_len = cur_v_len;
+                    irule->rp_len = tmp_r ? cur_r_len : 1;
+
+                    b_slash = strrchr(irule->virtual_path, '/');
+                    b_name_inter = b_slash ? b_slash + 1 : irule->virtual_path;
+                    irule->basename = b_name_inter;
+                    irule->b_len = strlen(b_name_inter);
+
+                    irule->v_hash = h_inter;
+                    irule->v_ino = (unsigned long)h_inter;
+                    irule->flags = NM_FLAG_IS_DIR;
+                    
+                    irule->real_ino = 0;
+                    irule->real_dev = 0;
+
+                    if (tmp_r) {
+                        struct path r_path_struct;
+                        if (kern_path(irule->real_path, LOOKUP_FOLLOW, &r_path_struct) == 0) {
+                            unsigned long r_ino = d_backing_inode(r_path_struct.dentry)->i_ino;
+                            if (r_ino > 10) {
+                                irule->real_ino = r_ino;
+                                irule->real_dev = r_path_struct.dentry->d_sb->s_dev;
+                            }
+                            path_put(&r_path_struct);
+                        }
+                    }
+                }
+            }
+            current_flags = NM_FLAG_IS_DIR;
+            child_len = cur_v_len;
+        }
+    }
+
+    while (p_count > 0) {
+        p_count--;
+        if (slashes_v[p_count]) *slashes_v[p_count] = '/';
+        if (slashes_r[p_count]) *slashes_r[p_count] = '/';
+
+        if (pending_rules[p_count]) {
+            struct nomount_rule *irule = pending_rules[p_count];
+            
+            if (err == 0) {
+                u32 bh = full_name_hash(NULL, irule->basename, irule->b_len);
+                
+                irule->v_dev = inherited_dev;
+                irule->v_fs_type = inherited_fs_type;
+
+                hash_add_rcu(nomount_basenames_ht, &irule->basename_node, bh);
+                hash_add_rcu(nomount_rules_by_vpath, &irule->vpath_node, irule->v_hash);
+                
+                if (irule->real_ino)
+                    hash_add_rcu(nomount_rules_by_real_ino, &irule->real_ino_node, irule->real_ino);
+                    
+                hash_add_rcu(nomount_rules_by_v_ino, &irule->v_ino_node, irule->v_ino);
+
+                list_add_tail_rcu(&irule->list, &nomount_rules_list);
+                atomic_inc(&nm_active_rules);
+            } else {
+                kfree(irule->virtual_path);
+                kfree(irule->real_path);
+                kmem_cache_free(nm_rule_cachep, irule);
+            }
+        }
+    }
+    
+    if (tmp_v) __putname(tmp_v);
+    if (tmp_r) __putname(tmp_r);
+
+    if (err == 0) {
+        rule->v_dev = inherited_dev;
+        rule->v_fs_type = inherited_fs_type;
+    }
+
+    return err;
+}
+
 /*** Metadata Spoofing ***/
 
 /**
@@ -653,15 +892,18 @@ void nomount_spoof_stat(const struct path *path, struct kstat *stat)
 {
     struct nomount_rule *rule;
     struct inode *inode;
+    dev_t current_dev;
 
     if (IS_ERR_OR_NULL(path) || IS_ERR_OR_NULL(stat)) return;
     if (unlikely(nomount_num_rules() == 0)) return;
     inode = d_backing_inode(path->dentry);
     if (!inode) return;
 
+    current_dev = inode->i_sb->s_dev;
+
     rcu_read_lock();
     hash_for_each_possible_rcu(nomount_rules_by_real_ino, rule, real_ino_node, inode->i_ino) {
-        if (rule->real_ino == inode->i_ino) {
+        if (rule->real_ino == inode->i_ino && rule->real_dev == current_dev) {
             stat->ino = READ_ONCE(rule->v_ino);
             if (rule->v_dev != 0)
                 stat->dev = READ_ONCE(rule->v_dev);
@@ -683,15 +925,18 @@ void nomount_spoof_statfs(const struct path *path, struct kstatfs *buf)
 {
     struct nomount_rule *rule;
     struct inode *inode;
+    dev_t current_dev;
 
-    if (IS_ERR_OR_NULL(path) || !buf || __nomount_should_skip()) return;
+    if (IS_ERR_OR_NULL(path) || IS_ERR_OR_NULL(buf) || __nomount_should_skip()) return;
     if (unlikely(nomount_num_rules() == 0)) return;
     inode = d_backing_inode(path->dentry);
     if (!inode) return;
 
+    current_dev = inode->i_sb->s_dev;
+
     rcu_read_lock();
     hash_for_each_possible_rcu(nomount_rules_by_real_ino, rule, real_ino_node, inode->i_ino) {
-        if (rule->real_ino == inode->i_ino) {
+        if (rule->real_ino == inode->i_ino && rule->real_dev == current_dev) {
             if (rule->v_fs_type != 0)
                 buf->f_type = READ_ONCE(rule->v_fs_type);
             goto unlock;
@@ -699,7 +944,7 @@ void nomount_spoof_statfs(const struct path *path, struct kstatfs *buf)
     }
 
     hash_for_each_possible_rcu(nomount_rules_by_v_ino, rule, v_ino_node, inode->i_ino) {
-        if (rule->v_ino == inode->i_ino) {
+        if (rule->v_ino == inode->i_ino && rule->v_dev == current_dev) {
             if (rule->v_fs_type != 0)
                 buf->f_type = READ_ONCE(rule->v_fs_type);
             break;
@@ -772,20 +1017,32 @@ static int nomount_ioctl_add_rule(unsigned long arg)
 {
     struct nomount_ioctl_data data;
     struct nomount_rule *rule, *existing;
+    struct path path_main, r_path_struct_main;
     char *v_path, *r_path, *slash;
     const char *b_name;
-    struct path path;
-    struct kstatfs tmp_stfs;
     size_t v_len;
     u32 hash, b_hash;
+    int err = 0;
 
-    if (copy_from_user(&data, (void __user *)arg, sizeof(data)))
+    if (copy_from_user(&data, (void __user *)arg, sizeof(data))) {
+        nm_warn("Failed to copy rule data from userspace\n");
         return -EFAULT;
-    if (!capable(CAP_SYS_ADMIN)) return -EPERM;
+    }
 
-    v_path = strndup_user(data.virtual_path, PATH_MAX);
-    r_path = strndup_user(data.real_path, PATH_MAX);
-    if (IS_ERR_OR_NULL(v_path) || IS_ERR_OR_NULL(r_path)) return -ENOMEM;
+    if (!capable(CAP_SYS_ADMIN)) {
+        nm_warn("Permission denied: CAP_SYS_ADMIN required\n");
+        return -EPERM;
+    }
+
+    v_path = strndup_user((const char __user *)(unsigned long)data.virtual_path, PATH_MAX);
+    r_path = strndup_user((const char __user *)(unsigned long)data.real_path, PATH_MAX);
+    if (IS_ERR_OR_NULL(v_path) || IS_ERR_OR_NULL(r_path)) {
+        nm_err("Failed to allocate memory for path strings\n");
+        if (!IS_ERR_OR_NULL(v_path)) kfree(v_path);
+        if (!IS_ERR_OR_NULL(r_path)) kfree(r_path);
+        return -ENOMEM;
+    }
+    
     v_len = strlen(v_path);
     hash = full_name_hash(NULL, v_path, v_len);
 
@@ -794,6 +1051,7 @@ static int nomount_ioctl_add_rule(unsigned long arg)
         if (existing->v_hash == hash && existing->vp_len == v_len &&
              memcmp(existing->virtual_path, v_path, v_len) == 0) {
             mutex_unlock(&nomount_write_mutex);
+            nm_warn("Rule already exists for virtual path: %s. Aborting.\n", v_path);
             kfree(v_path); 
             kfree(r_path);
             return -EEXIST;
@@ -803,6 +1061,7 @@ static int nomount_ioctl_add_rule(unsigned long arg)
     rule = kmem_cache_zalloc(nm_rule_cachep, GFP_KERNEL);
     if (!rule) {
         mutex_unlock(&nomount_write_mutex);
+        nm_err("Failed to allocate slab cache memory for new rule\n");
         kfree(v_path); kfree(r_path);
         return -ENOMEM;
     }
@@ -818,84 +1077,49 @@ static int nomount_ioctl_add_rule(unsigned long arg)
     rule->b_len = strlen(b_name);
 
     rule->v_hash = hash;
-    rule->real_ino = data.real_ino;
     rule->flags = data.flags;
+
+    rule->real_ino = 0;
+    rule->real_dev = 0;
 
     nm_enter();
 
-    if (kern_path(v_path, LOOKUP_FOLLOW, &path) == 0) {
-        rule->v_ino = d_backing_inode(path.dentry)->i_ino;
-        rule->v_dev = path.dentry->d_sb->s_dev;
-        if (path.dentry->d_sb->s_op->statfs) {
-            path.dentry->d_sb->s_op->statfs(path.dentry, &tmp_stfs);
-            rule->v_fs_type = tmp_stfs.f_type;
-        } else {
-            rule->v_fs_type = path.dentry->d_sb->s_magic;
+    if (kern_path(r_path, LOOKUP_FOLLOW, &r_path_struct_main) == 0) {
+        struct inode *r_inode = d_backing_inode(r_path_struct_main.dentry);
+        rule->real_ino = r_inode->i_ino;
+        rule->real_dev = r_path_struct_main.dentry->d_sb->s_dev;
+        if (S_ISDIR(r_inode->i_mode)) {
+            rule->flags |= NM_FLAG_IS_DIR;
         }
-        path_put(&path);
+        path_put(&r_path_struct_main);
+    }
+
+    if (kern_path(v_path, LOOKUP_FOLLOW, &path_main) == 0) {
+        rule->v_ino = d_backing_inode(path_main.dentry)->i_ino;
+        rule->v_dev = path_main.dentry->d_sb->s_dev;
+        if (path_main.dentry->d_sb->s_op->statfs) {
+            struct kstatfs st;
+            path_main.dentry->d_sb->s_op->statfs(path_main.dentry, &st);
+            rule->v_fs_type = st.f_type;
+        } else {
+            rule->v_fs_type = path_main.dentry->d_sb->s_magic;
+        }
+        path_put(&path_main);
+        nm_debug("Resolved physical backing for %s (ino: %lu)\n", v_path, rule->v_ino);
     } else {
         rule->v_ino = (unsigned long)hash;
-
-        {
-            char *tmp_path = __getname();
-            if (tmp_path) {
-                struct path p_path;
-                unsigned long current_parent_ino;
-                bool is_dir = (data.flags & NM_FLAG_IS_DIR) ? true : false;
-                int child_len = v_len;
-
-                memcpy(tmp_path, v_path, v_len + 1);
-                while (1) {
-                    slash = strrchr(tmp_path, '/');
-                    if (!slash || slash == tmp_path) {
-                        if (kern_path("/", LOOKUP_FOLLOW, &p_path) == 0) {
-                            rule->v_dev = p_path.dentry->d_sb->s_dev;
-                            if (p_path.dentry->d_sb->s_op->statfs) {
-                                p_path.dentry->d_sb->s_op->statfs(p_path.dentry, &tmp_stfs);
-                                rule->v_fs_type = tmp_stfs.f_type;
-                            } else {
-                                rule->v_fs_type = p_path.dentry->d_sb->s_magic;
-                            }
-                            current_parent_ino = d_backing_inode(p_path.dentry)->i_ino;
-                            __nomount_auto_inject_parent(current_parent_ino, tmp_path + 1, 
-                                is_dir ? DT_DIR : DT_REG, full_name_hash(NULL, v_path, child_len));
-                            d_invalidate(p_path.dentry);
-                            path_put(&p_path);
-                        }
-                        break;
-                    }
-
-                    *slash = '\0';
-                    
-                    if (kern_path(tmp_path, LOOKUP_FOLLOW, &p_path) == 0) {
-                        rule->v_dev = p_path.dentry->d_sb->s_dev;
-                        if (p_path.dentry->d_sb->s_op->statfs) {
-                            p_path.dentry->d_sb->s_op->statfs(p_path.dentry, &tmp_stfs);
-                            rule->v_fs_type = tmp_stfs.f_type;
-                        } else {
-                            rule->v_fs_type = p_path.dentry->d_sb->s_magic;
-                        }
-                        current_parent_ino = d_backing_inode(p_path.dentry)->i_ino;
-                        __nomount_auto_inject_parent(current_parent_ino, slash + 1, 
-                            is_dir ? DT_DIR : DT_REG, full_name_hash(NULL, v_path, child_len));
-                        d_invalidate(p_path.dentry);
-                        path_put(&p_path);
-                        break; 
-                    } else {
-                        current_parent_ino = (unsigned long)full_name_hash(NULL, v_path, slash - tmp_path);
-                        __nomount_auto_inject_parent(current_parent_ino, slash + 1, 
-                            is_dir ? DT_DIR : DT_REG, full_name_hash(NULL, v_path, child_len));
-
-                        is_dir = true;
-                        child_len = slash - tmp_path;
-                    }
-                }
-                __putname(tmp_path);
-            }
+        err = nomount_generate_virtual_topology(rule, v_path, r_path, v_len, data.flags);
+        if (err != 0) {
+            nm_exit();
+            mutex_unlock(&nomount_write_mutex);
+            kfree(v_path);
+            kfree(r_path);
+            kmem_cache_free(nm_rule_cachep, rule);
+            return err;
         }
     }
 
-    __nomount_collect_parents(r_path, rule->rp_len);
+    __nomount_collect_parents(rule->real_path, rule->rp_len);
     nm_exit();
 
     b_hash = full_name_hash(NULL, rule->basename, rule->b_len);
@@ -909,8 +1133,10 @@ static int nomount_ioctl_add_rule(unsigned long arg)
 
     list_add_tail_rcu(&rule->list, &nomount_rules_list);
     atomic_inc(&nm_active_rules);
-    nomount_drop_vpath_cache(v_path, (data.flags & NM_FLAG_IS_DIR));
+    nomount_drop_vpath_cache(v_path, (rule->flags & NM_FLAG_IS_DIR));
     mutex_unlock(&nomount_write_mutex);
+
+    nm_info("Successfully added rule: %s -> %s\n", rule->virtual_path, rule->real_path);
 
     return 0;
 }
@@ -933,7 +1159,7 @@ static int nomount_ioctl_del_rule(unsigned long arg)
     if (!capable(CAP_SYS_ADMIN))
         return -EPERM;
 
-    v_path = strndup_user(data.virtual_path, PATH_MAX);
+    v_path = strndup_user((const char __user *)(unsigned long)data.virtual_path, PATH_MAX);
     if (IS_ERR_OR_NULL(v_path)) return -ENOMEM;
     v_len = strlen(v_path);
     hash = full_name_hash(NULL, v_path, v_len);
@@ -974,6 +1200,7 @@ ghost_found:
 
     if (victim) {
         nomount_drop_vpath_cache(v_path, (victim->flags & NM_FLAG_IS_DIR));
+        nm_info("Deleted rule for: %s\n", victim->virtual_path);
         synchronize_rcu();
 
         if (victim_child) {
@@ -1073,6 +1300,7 @@ static int nomount_ioctl_clear_rules(void)
         kmem_cache_free(nm_uid_cachep, uid_node);
     }
 
+    nm_info("Cleared all active rules and UIDs\n");
     return 0;
 }
 
@@ -1081,23 +1309,36 @@ static int nomount_ioctl_list_rules(unsigned long arg)
     struct nomount_rule *rule;
     char *kbuf;
     unsigned short *p_len;
+    size_t total_required = 0;
     size_t pos = 0;
-    const size_t max_size = MAX_LIST_BUFFER_SIZE;
     int ret = 0;
 
-    kbuf = kvmalloc(max_size, GFP_KERNEL);
-    if (!kbuf) return -ENOMEM;
+    mutex_lock(&nomount_write_mutex);
+    list_for_each_entry(rule, &nomount_rules_list, list) {
+        total_required += sizeof(unsigned short) * 2 + (rule->vp_len + 1) + (rule->rp_len + 1);
+    }
 
-    rcu_read_lock();
-    list_for_each_entry_rcu(rule, &nomount_rules_list, list) {
+    if (total_required == 0) {
+        mutex_unlock(&nomount_write_mutex);
+        return 0;
+    }
+
+    kbuf = kmalloc(total_required, GFP_KERNEL);
+    if (!kbuf) {
+        mutex_unlock(&nomount_write_mutex);
+        nm_err("Failed to allocate %zu bytes for listing rules\n", total_required);
+        return -ENOMEM;
+    }
+
+    list_for_each_entry(rule, &nomount_rules_list, list) {
         size_t v_len = rule->vp_len + 1; 
         size_t r_len = rule->rp_len + 1;
-        size_t total_len = sizeof(unsigned short) * 2 + v_len + r_len;
+        size_t step_len = sizeof(unsigned short) * 2 + v_len + r_len;
 
-        if (pos + total_len > max_size) break;
+        if (pos + step_len > total_required) break;
 
         p_len = (unsigned short *)(kbuf + pos);
-        *p_len = total_len;
+        *p_len = step_len;
         pos += sizeof(unsigned short);
 
         p_len = (unsigned short *)(kbuf + pos);
@@ -1110,18 +1351,17 @@ static int nomount_ioctl_list_rules(unsigned long arg)
         memcpy(kbuf + pos, rule->real_path, r_len);
         pos += r_len;
     }
-    rcu_read_unlock();
 
-    if (pos > 0) {
-        if (copy_to_user((void __user *)arg, kbuf, pos))
-            ret = -EFAULT;
-        else
-            ret = pos; 
+    mutex_unlock(&nomount_write_mutex);
+
+    if (copy_to_user((void __user *)arg, kbuf, pos)) {
+        nm_warn("-EFAULT while copying rule list to userspace\n");
+        ret = -EFAULT;
     } else {
-        ret = 0; 
+        ret = pos; 
     }
 
-    kvfree(kbuf);
+    kfree(kbuf);
     return ret;
 }
 
@@ -1230,6 +1470,7 @@ static int __init nomount_init(void) {
                                       0, SLAB_HWCACHE_ALIGN, NULL);
 
     if (!nm_rule_cachep || !nm_dir_cachep || !nm_uid_cachep) {
+        nm_err("Failed to allocate memory slab caches\n");
         if (nm_rule_cachep) kmem_cache_destroy(nm_rule_cachep);
         if (nm_dir_cachep) kmem_cache_destroy(nm_dir_cachep);
         if (nm_uid_cachep) kmem_cache_destroy(nm_uid_cachep);
@@ -1238,13 +1479,14 @@ static int __init nomount_init(void) {
 
     ret = misc_register(&nomount_device);
     if (ret) {
+        nm_err("Failed to register misc device '/dev/nomount' (err: %d)\n", ret);
         kmem_cache_destroy(nm_rule_cachep);
         kmem_cache_destroy(nm_dir_cachep);
         kmem_cache_destroy(nm_uid_cachep);
         return ret;
     }
 
-    pr_info("NoMount: Loaded\n");
+    nm_info("Loaded successfully\n");
     return 0;
 }
 
