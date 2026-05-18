@@ -4,7 +4,6 @@
 #include <linux/namei.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
-#include <linux/miscdevice.h>
 #include <linux/cred.h>
 #include <linux/statfs.h>
 #include <linux/fs_struct.h>
@@ -13,6 +12,7 @@
 #include "nomount.h"
 
 static struct kmem_cache *nm_rule_cachep, *nm_dir_cachep, *nm_uid_cachep;
+const loff_t nomount_magic_pos = 0x7E000000;
 atomic_t nm_active_rules = ATOMIC_INIT(0);
 atomic_t nm_active_dirs = ATOMIC_INIT(0);
 #define nomount_num_rules() atomic_read(&nm_active_rules)
@@ -68,6 +68,8 @@ bool nomount_should_skip(void) {
 }
 EXPORT_SYMBOL(nomount_should_skip);
 
+/*** Helpers & Path Resolution ***/
+
 /**
  * __nomount_is_injected_file_rcu - Check if an inode number belongs to an injected file.
  * @ino: The inode number to check
@@ -107,113 +109,6 @@ static inline bool __nomount_is_traversal_allowed_rcu(unsigned long ino) {
         if (dir->dir_ino == ino) return true;
     }
     return false;
-}
-
-/*** Helpers & Path Resolution ***/
-
-/**
- * nomount_drop_vpath_cache - Force VFS to drop dcache for a specific path
- * @path_str: The native absolute path to flush
- * @is_dir: True if we should aggressively invalidate a directory
- */
-static void nomount_drop_vpath_cache(const char *path_str, bool is_dir)
-{
-    struct path path;
-    nm_enter();
-    if (kern_path(path_str, 0, &path) == 0) {
-        if (is_dir) {
-            d_invalidate(path.dentry);
-        } else {
-            d_drop(path.dentry);
-        }
-        path_put(&path);
-    }
-    nm_exit();
-}
-
-/**
- * __nomount_collect_parents - Track parent directories of a real path
- * @real_path: The absolute path of the underlying target file
- *
- * Recursively resolves and registers parent directory inodes to ensure
- * traversal permissions are granted during lookup operations.
- *
- * This function assumes the caller holds the nomount_write_mutex 
- * and is not in a recursive context. 
- */
-static void __nomount_collect_parents(const char *real_path, size_t len)
-{
-    char *path_tmp, *p, *slash;
-    struct path kp;
-    struct nomount_dir_node *dir_node;
-    struct inode *p_inode;
-    unsigned long p_ino;
-    umode_t mode;
-    bool priv;
-
-    if (!real_path) return;
-
-    path_tmp = __getname();
-    if (!path_tmp) return;
-    memcpy(path_tmp, real_path, len + 1);
-
-    p = path_tmp;
-    while (1) {
-        slash = strrchr(p, '/');
-        if (!slash || slash == p)
-            break;
-
-        *slash = '\0';
-
-        nm_enter();
-        if (likely(kern_path(p, LOOKUP_FOLLOW, &kp) == 0)) {
-            p_inode = d_backing_inode(kp.dentry);
-            p_ino = p_inode->i_ino;
-            mode = p_inode->i_mode;
-            priv = ((mode & S_IXOTH) == 0);
-            path_put(&kp);
-            nm_exit();
-
-            {
-                struct nomount_dir_node *curr;
-                bool exists = false;
-                
-                hash_for_each_possible(nomount_dirs_ht, curr, node, p_ino) {
-                    if (curr->dir_ino == p_ino) {
-                        exists = true;
-                        break;
-                    }
-                }
-
-                if (exists)
-                    break;
-
-                dir_node = kmem_cache_alloc(nm_dir_cachep, GFP_KERNEL);
-                if (likely(dir_node)) {
-                    dir_node->dir_ino = p_ino;
-                    dir_node->is_private = priv;
-                    dir_node->next_child_index = 0;
-                    INIT_LIST_HEAD(&dir_node->children_names);
-                    INIT_LIST_HEAD(&dir_node->private_list);
-                    hash_add_rcu(nomount_dirs_ht, &dir_node->node, p_ino);
-                    if (unlikely(priv)) {
-                        dir_node->dir_path_len = (u16)(slash - p);
-                        dir_node->dir_path = kstrdup(p, GFP_KERNEL);
-                        if (likely(dir_node->dir_path)) {
-                            list_add_tail_rcu(&dir_node->private_list, &nomount_private_dirs_list);
-                        }
-                    } else {
-                        dir_node->dir_path = NULL;
-                        dir_node->dir_path_len = 0;
-                    }
-                    atomic_inc(&nm_active_dirs);
-                }
-            }
-        } else {
-            nm_exit();
-        }
-    }
-    __putname(path_tmp);
 }
 
 /**
@@ -262,6 +157,26 @@ static char *nomount_build_path_from_pwd(const char *rel_name, size_t name_len, 
 
     __putname(page_buf);
     return NULL;
+}
+
+/**
+ * nomount_drop_vpath_cache - Force VFS to drop dcache for a specific path
+ * @path_str: The native absolute path to flush
+ * @is_dir: True if we should aggressively invalidate a directory
+ */
+static void nomount_drop_vpath_cache(const char *path_str, bool is_dir)
+{
+    struct path path;
+    nm_enter();
+    if (kern_path(path_str, 0, &path) == 0) {
+        if (is_dir) {
+            d_invalidate(path.dentry);
+        } else {
+            d_drop(path.dentry);
+        }
+        path_put(&path);
+    }
+    nm_exit();
 }
 
 /**
@@ -416,7 +331,7 @@ int nomount_allow_access(struct inode *inode, int mask)
  */
 struct filename *nomount_getname_hook(struct filename *name)
 {
-    struct nomount_rule *rule;
+    struct nomount_rule *rule, *recheck;
     char *abs_path = NULL, *rp_copy = NULL;
     const char *check_name;
     const char *s, *last_slash;
@@ -424,7 +339,6 @@ struct filename *nomount_getname_hook(struct filename *name)
     struct filename *new_name;
     bool basename_match = false;
     u32 b_hash;
-    struct nomount_rule *recheck;
 
     if (unlikely(nomount_num_rules() == 0 && nomount_num_dirs() == 0))
         return name;
@@ -506,17 +420,32 @@ struct filename *nomount_getname_hook(struct filename *name)
     rcu_read_unlock();
 
     if (likely(rule)) {
-        rp_copy = __getname();
-        if (likely(rp_copy)) {
-            rcu_read_lock();
-            recheck = nomount_get_rule_by_path(check_name, r_len);
-            if (likely(recheck && recheck == rule)) {
-                memcpy(rp_copy, rule->real_path, rule->rp_len + 1);
-            } else {
-                __putname(rp_copy);
-                rp_copy = NULL;
+        struct path zpath;
+        bool is_zombie = false;
+
+        nm_enter();
+        if (kern_path(rule->real_path, LOOKUP_FOLLOW, &zpath) != 0) {
+            is_zombie = true;
+        } else {
+            path_put(&zpath);
+        }
+        nm_exit();
+
+        if (unlikely(is_zombie)) {
+            nm_debug("Zombie rule ignored: %s is currently missing\n", rule->real_path);
+        } else {
+            rp_copy = __getname();
+            if (likely(rp_copy)) {
+                rcu_read_lock();
+                recheck = nomount_get_rule_by_path(check_name, r_len);
+                if (likely(recheck && recheck == rule)) {
+                    memcpy(rp_copy, rule->real_path, rule->rp_len + 1);
+                } else {
+                    __putname(rp_copy);
+                    rp_copy = NULL;
+                }
+                rcu_read_unlock();
             }
-            rcu_read_unlock();
         }
     }
 
@@ -563,11 +492,11 @@ void nomount_vfs_inject_dir(struct file *file, struct dir_context *ctx)
 
     nm_enter();
 
-    if (ctx->pos >= NOMOUNT_MAGIC_POS && ctx->pos < NOMOUNT_MAGIC_POS + 100000) {
-        v_index = (unsigned long)(ctx->pos - NOMOUNT_MAGIC_POS);
+    if (ctx->pos >= nomount_magic_pos && ctx->pos < nomount_magic_pos + 100000) {
+        v_index = (unsigned long)(ctx->pos - nomount_magic_pos);
     } else {
         v_index = 0;
-        ctx->pos = NOMOUNT_MAGIC_POS;
+        ctx->pos = nomount_magic_pos;
     }
 
     down_read(&nomount_dirs_rwsem); 
@@ -586,7 +515,7 @@ void nomount_vfs_inject_dir(struct file *file, struct dir_context *ctx)
                     break; 
                 }
 
-                ctx->pos = NOMOUNT_MAGIC_POS + child->v_index + 1;
+                ctx->pos = nomount_magic_pos + child->v_index + 1;
             }
             break; 
         }
@@ -595,6 +524,92 @@ void nomount_vfs_inject_dir(struct file *file, struct dir_context *ctx)
     up_read(&nomount_dirs_rwsem);
     nm_exit();
 }
+
+/**
+ * __nomount_collect_parents - Track parent directories of a real path
+ * @real_path: The absolute path of the underlying target file
+ *
+ * Recursively resolves and registers parent directory inodes to ensure
+ * traversal permissions are granted during lookup operations.
+ *
+ * This function assumes the caller holds the nomount_write_mutex 
+ * and is not in a recursive context. 
+ */
+static void __nomount_collect_parents(const char *real_path, size_t len)
+{
+    char *path_tmp, *p, *slash;
+    struct path kp;
+    struct nomount_dir_node *dir_node;
+    struct inode *p_inode;
+    unsigned long p_ino;
+    umode_t mode;
+    bool priv;
+
+    if (!real_path) return;
+
+    path_tmp = __getname();
+    if (!path_tmp) return;
+    memcpy(path_tmp, real_path, len + 1);
+
+    p = path_tmp;
+    while (1) {
+        slash = strrchr(p, '/');
+        if (!slash || slash == p)
+            break;
+
+        *slash = '\0';
+
+        nm_enter();
+        if (likely(kern_path(p, LOOKUP_FOLLOW, &kp) == 0)) {
+            p_inode = d_backing_inode(kp.dentry);
+            p_ino = p_inode->i_ino;
+            mode = p_inode->i_mode;
+            priv = ((mode & S_IXOTH) == 0);
+            path_put(&kp);
+            nm_exit();
+
+            {
+                struct nomount_dir_node *curr;
+                bool exists = false;
+                
+                hash_for_each_possible(nomount_dirs_ht, curr, node, p_ino) {
+                    if (curr->dir_ino == p_ino) {
+                        exists = true;
+                        break;
+                    }
+                }
+
+                if (exists)
+                    break;
+
+                dir_node = kmem_cache_alloc(nm_dir_cachep, GFP_KERNEL);
+                if (likely(dir_node)) {
+                    dir_node->dir_ino = p_ino;
+                    dir_node->is_private = priv;
+                    dir_node->next_child_index = 0;
+                    INIT_LIST_HEAD(&dir_node->children_names);
+                    INIT_LIST_HEAD(&dir_node->private_list);
+                    hash_add_rcu(nomount_dirs_ht, &dir_node->node, p_ino);
+                    if (unlikely(priv)) {
+                        dir_node->dir_path_len = (u16)(slash - p);
+                        dir_node->dir_path = kstrdup(p, GFP_KERNEL);
+                        if (likely(dir_node->dir_path)) {
+                            list_add_tail_rcu(&dir_node->private_list, &nomount_private_dirs_list);
+                        }
+                    } else {
+                        dir_node->dir_path = NULL;
+                        dir_node->dir_path_len = 0;
+                    }
+                    atomic_inc(&nm_active_dirs);
+                }
+            }
+        } else {
+            nm_exit();
+        }
+    }
+    __putname(path_tmp);
+}
+
 
 /**
  * __nomount_auto_inject_parent - Create a fake directory entry node
@@ -1012,45 +1027,34 @@ int nomount_handle_getattr(int ret, const struct path *path, struct kstat *stat)
     return ret;
 }
 
-/*** IOCTL API & Module Management ***/
+/*** Generic Netlink API & Module Management ***/
 
-static int nomount_ioctl_add_rule(unsigned long arg)
+static struct genl_family nomount_genl_family;
+
+static int nomount_genl_add_rule(struct sk_buff *skb, struct genl_info *info)
 {
-    struct nomount_ioctl_data data;
     struct nomount_rule *rule, *existing, *victim = NULL;
     struct path path_main, r_path_struct_main;
     char *v_path, *r_path, *slash;
     const char *b_name;
     size_t v_len;
-    u32 hash, b_hash;
+    u32 hash, b_hash, flags;
     int err = 0;
     bool v_path_exists = false;
 
-    if (copy_from_user(&data, (void __user *)arg, sizeof(data))) {
-        nm_warn("Failed to copy rule data from userspace\n");
-        return -EFAULT;
-    }
+    if (!info->attrs[NOMOUNT_ATTR_VIRTUAL_PATH] || !info->attrs[NOMOUNT_ATTR_REAL_PATH])
+        return -EINVAL;
 
-    if (!capable(CAP_SYS_ADMIN)) {
-        nm_warn("Permission denied: CAP_SYS_ADMIN required\n");
-        return -EPERM;
-    }
-
-    /* Fetch virtual_path from userspace */
-    v_path = strndup_user((const char __user *)(unsigned long)data.virtual_path, PATH_MAX);
-    if (IS_ERR(v_path)) {
-        nm_err("Failed to allocate or copy virtual path\n");
-        return PTR_ERR(v_path);
-    }
-
-    /* Fetch real_path from userspace */
-    r_path = strndup_user((const char __user *)(unsigned long)data.real_path, PATH_MAX);
-    if (IS_ERR(r_path)) {
-        nm_err("Failed to allocate or copy real path\n");
-        kfree(v_path); /* Safe to free since v_path succeeded above */
-        return PTR_ERR(r_path);
-    }
+    v_path = kstrdup(nla_data(info->attrs[NOMOUNT_ATTR_VIRTUAL_PATH]), GFP_KERNEL);
+    r_path = kstrdup(nla_data(info->attrs[NOMOUNT_ATTR_REAL_PATH]), GFP_KERNEL);
+    flags = info->attrs[NOMOUNT_ATTR_FLAGS] ? nla_get_u32(info->attrs[NOMOUNT_ATTR_FLAGS]) : 0;
     
+    if (!v_path || !r_path) {
+        kfree(v_path); 
+        kfree(r_path);
+        return -ENOMEM;
+    }
+
     v_len = strlen(v_path);
     hash = full_name_hash(NULL, v_path, v_len);
 
@@ -1078,7 +1082,7 @@ static int nomount_ioctl_add_rule(unsigned long arg)
     rule->b_len = strlen(b_name);
 
     rule->v_hash = hash;
-    rule->flags = data.flags;
+    rule->flags = flags;
 
     rule->real_ino = 0;
     rule->real_dev = 0;
@@ -1135,7 +1139,7 @@ static int nomount_ioctl_add_rule(unsigned long arg)
     }
 
     if (!v_path_exists) {
-        err = nomount_generate_virtual_topology(rule, v_path, r_path, v_len, data.flags);
+        err = nomount_generate_virtual_topology(rule, v_path, r_path, v_len, flags);
         if (err != 0) {
             up_write(&nomount_dirs_rwsem);
             mutex_unlock(&nomount_write_mutex);
@@ -1176,9 +1180,8 @@ static int nomount_ioctl_add_rule(unsigned long arg)
     return 0;
 }
 
-static int nomount_ioctl_del_rule(unsigned long arg)
+static int nomount_genl_del_rule(struct sk_buff *skb, struct genl_info *info)
 {
-    struct nomount_ioctl_data data;
     struct nomount_rule *rule, *victim = NULL;
     struct nomount_dir_node *dir, *victim_dir = NULL;
     struct nomount_child_name *child, *victim_child = NULL;
@@ -1187,17 +1190,15 @@ static int nomount_ioctl_del_rule(unsigned long arg)
     u32 hash;
     int bkt;
 
-    if (copy_from_user(&data, (void __user *)arg, sizeof(data)))
-        return -EFAULT;
-
-    if (!capable(CAP_SYS_ADMIN))
-        return -EPERM;
-
     if (unlikely(nomount_num_rules() == 0))
         return -ENOENT;
 
-    v_path = strndup_user((const char __user *)(unsigned long)data.virtual_path, PATH_MAX);
-    if (IS_ERR(v_path)) return PTR_ERR(v_path);
+    if (!info->attrs[NOMOUNT_ATTR_VIRTUAL_PATH])
+        return -EINVAL;
+
+    v_path = kstrdup(nla_data(info->attrs[NOMOUNT_ATTR_VIRTUAL_PATH]), GFP_KERNEL);
+    if (!v_path)
+        return -ENOMEM;
     
     v_len = strlen(v_path);
     hash = full_name_hash(NULL, v_path, v_len);
@@ -1263,7 +1264,7 @@ ghost_found:
     return -ENOENT;
 }
 
-static int nomount_ioctl_clear_rules(void)
+static int nomount_genl_clear_rules(struct sk_buff *skb, struct genl_info *info)
 {
     struct nomount_rule *rule, *tmp_rule;
     struct nomount_uid_node *uid_node;
@@ -1275,9 +1276,6 @@ static int nomount_ioctl_clear_rules(void)
     HLIST_HEAD(uid_victims);
     HLIST_HEAD(dir_victims);
     int bkt;
-    
-    if (!capable(CAP_SYS_ADMIN))
-        return -EPERM;
 
     mutex_lock(&nomount_write_mutex);
     down_write(&nomount_dirs_rwsem);
@@ -1338,76 +1336,61 @@ static int nomount_ioctl_clear_rules(void)
     return 0;
 }
 
-static int nomount_ioctl_list_rules(unsigned long arg)
+static int nomount_genl_dump_rules(struct sk_buff *skb, struct netlink_callback *cb)
 {
     struct nomount_rule *rule;
-    char *kbuf;
-    size_t total_required = 0;
-    size_t pos = 0;
-    int ret = 0;
+    void *hdr;
+    int idx = 0;
+    int start_idx = cb->args[0];
 
     mutex_lock(&nomount_write_mutex);
-    list_for_each_entry(rule, &nomount_rules_list, list) {
-        total_required += sizeof(u16) * 2 + (rule->vp_len + 1) + (rule->rp_len + 1);
-    }
-
-    if (total_required == 0) {
-        mutex_unlock(&nomount_write_mutex);
-        return 0;
-    }
-
-    kbuf = kvmalloc(total_required, GFP_KERNEL);
-    if (!kbuf) {
-        mutex_unlock(&nomount_write_mutex);
-        nm_err("Failed to allocate %zu bytes for listing rules\n", total_required);
-        return -ENOMEM;
-    }
 
     list_for_each_entry(rule, &nomount_rules_list, list) {
-        u16 v_len = rule->vp_len + 1; 
-        u16 r_len = rule->rp_len + 1;
-        u16 step_len = sizeof(u16) * 2 + v_len + r_len;
+        if (idx < start_idx) {
+            idx++;
+            continue;
+        }
 
-        if (pos + step_len > total_required) break;
+        hdr = genlmsg_put(skb, NETLINK_CB(cb->skb).portid, cb->nlh->nlmsg_seq,
+                                &nomount_genl_family, NLM_F_MULTI, NOMOUNT_CMD_GET_LIST);
+        if (!hdr)
+            break;
 
-        put_unaligned(step_len, (u16 *)(kbuf + pos));
-        pos += sizeof(u16);
+        if (nla_put_string(skb, NOMOUNT_ATTR_VIRTUAL_PATH, rule->virtual_path) ||
+            nla_put_string(skb, NOMOUNT_ATTR_REAL_PATH, rule->real_path) ||
+            nla_put_u32(skb, NOMOUNT_ATTR_FLAGS, rule->flags)) {
 
-        put_unaligned(v_len, (u16 *)(kbuf + pos));
-        pos += sizeof(u16);
+            genlmsg_cancel(skb, hdr);
+            break;
+        }
 
-        memcpy(kbuf + pos, rule->virtual_path, v_len);
-        pos += v_len;
-
-        memcpy(kbuf + pos, rule->real_path, r_len);
-        pos += r_len;
+        genlmsg_end(skb, hdr);
+        idx++;
     }
 
     mutex_unlock(&nomount_write_mutex);
 
-    if (copy_to_user((void __user *)arg, kbuf, pos)) {
-        nm_warn("-EFAULT while copying rule list to userspace\n");
-        ret = -EFAULT;
-    } else {
-        ret = (int)pos; 
-    }
-
-    kvfree(kbuf);
-    return ret;
+    cb->args[0] = idx; 
+    
+    return skb->len;
 }
 
-static int nomount_ioctl_add_uid(unsigned long arg)
+static int nomount_genl_add_uid(struct sk_buff *skb, struct genl_info *info)
 {
     unsigned int uid;
     struct nomount_uid_node *entry;
 
-    if (copy_from_user(&uid, (void __user *)arg, sizeof(uid)))
-        return -EFAULT;
-    
-    if (nomount_is_uid_blocked(uid)) return -EEXIST;
+    if (!info->attrs[NOMOUNT_ATTR_UID])
+        return -EINVAL;
+
+    uid = nla_get_u32(info->attrs[NOMOUNT_ATTR_UID]);
+
+    if (nomount_is_uid_blocked(uid)) 
+        return -EEXIST;
 
     entry = kmem_cache_alloc(nm_uid_cachep, GFP_KERNEL);
-    if (!entry) return -ENOMEM;
+    if (!entry) 
+        return -ENOMEM;
 
     entry->uid = uid;
     
@@ -1415,10 +1398,11 @@ static int nomount_ioctl_add_uid(unsigned long arg)
     hash_add_rcu(nomount_uid_ht, &entry->node, uid);
     mutex_unlock(&nomount_write_mutex);
     
+    nm_info("Successfully added blocked UID: %u via Netlink\n", uid);
     return 0;
 }
 
-static int nomount_ioctl_del_uid(unsigned long arg)
+static int nomount_genl_del_uid(struct sk_buff *skb, struct genl_info *info)
 {
     unsigned int uid;
     struct nomount_uid_node *entry;
@@ -1426,8 +1410,10 @@ static int nomount_ioctl_del_uid(unsigned long arg)
     int bkt;
     bool found = false;
 
-    if (copy_from_user(&uid, (void __user *)arg, sizeof(uid)))
-        return -EFAULT;
+    if (!info->attrs[NOMOUNT_ATTR_UID])
+        return -EINVAL;
+
+    uid = nla_get_u32(info->attrs[NOMOUNT_ATTR_UID]);
 
     mutex_lock(&nomount_write_mutex);
     hash_for_each_safe(nomount_uid_ht, bkt, tmp, entry, node) {
@@ -1447,36 +1433,101 @@ static int nomount_ioctl_del_uid(unsigned long arg)
     return found ? 0 : -ENOENT;
 }
 
-static long nomount_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+static int nomount_genl_get_version(struct sk_buff *skb, struct genl_info *info)
 {
-    if (_IOC_TYPE(cmd) != NOMOUNT_MAGIC_CODE)
-        return -ENOTTY;
+    struct sk_buff *msg;
+    void *hdr;
+    int ret;
 
-    switch (cmd) {
-    case NOMOUNT_IOC_GET_VERSION: return NOMOUNT_VERSION;
-    case NOMOUNT_IOC_ADD_RULE:    return nomount_ioctl_add_rule(arg);
-    case NOMOUNT_IOC_DEL_RULE:    return nomount_ioctl_del_rule(arg);
-    case NOMOUNT_IOC_CLEAR_ALL:   return nomount_ioctl_clear_rules();
-    case NOMOUNT_IOC_ADD_UID:     return nomount_ioctl_add_uid(arg);
-    case NOMOUNT_IOC_DEL_UID:     return nomount_ioctl_del_uid(arg);
-    case NOMOUNT_IOC_GET_LIST:    return nomount_ioctl_list_rules(arg);
-    default: return -ENOTTY;
+    msg = genlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+    if (!msg) return -ENOMEM;
+
+    hdr = genlmsg_put_reply(msg, info, &nomount_genl_family, 0, info->genlhdr->cmd);
+    if (!hdr) {
+        nlmsg_free(msg);
+        return -EMSGSIZE;
     }
+
+    ret = nla_put_u32(msg, NOMOUNT_ATTR_VERSION, NOMOUNT_VERSION);
+    if (ret) {
+        genlmsg_cancel(msg, hdr);
+        nlmsg_free(msg);
+        return ret;
+    }
+
+    genlmsg_end(msg, hdr);
+    return genlmsg_reply(msg, info);
 }
 
-static const struct file_operations nomount_fops = {
-    .owner = THIS_MODULE,
-    .unlocked_ioctl = nomount_ioctl,
-#ifdef CONFIG_COMPAT
-    .compat_ioctl = nomount_ioctl,
-#endif
+static const struct nla_policy nomount_genl_policy[NOMOUNT_ATTR_MAX + 1] = {
+    [NOMOUNT_ATTR_VIRTUAL_PATH] = { .type = NLA_NUL_STRING, .len = PATH_MAX },
+    [NOMOUNT_ATTR_REAL_PATH]    = { .type = NLA_NUL_STRING, .len = PATH_MAX },
+    [NOMOUNT_ATTR_FLAGS]        = { .type = NLA_U32 },
+    [NOMOUNT_ATTR_UID]          = { .type = NLA_U32 },
+    [NOMOUNT_ATTR_VERSION]      = { .type = NLA_U32 },
 };
 
-static struct miscdevice nomount_device = {
-    .minor = MISC_DYNAMIC_MINOR, 
-    .name = "nomount", 
-    .fops = &nomount_fops, 
-    .mode = 0600,
+static const struct genl_ops nomount_genl_ops[] = {
+    {
+        .cmd = NOMOUNT_CMD_ADD_RULE,
+        .flags = GENL_ADMIN_PERM,
+        .doit = nomount_genl_add_rule,
+        .dumpit = NULL,
+        NM_OPS_POLICY(nomount_genl_policy)
+    },
+    {
+        .cmd = NOMOUNT_CMD_DEL_RULE,
+        .flags = GENL_ADMIN_PERM,
+        .doit = nomount_genl_del_rule,
+        .dumpit = NULL,
+        NM_OPS_POLICY(nomount_genl_policy)
+    },
+    {
+        .cmd = NOMOUNT_CMD_CLEAR_ALL,
+        .flags = GENL_ADMIN_PERM,
+        .doit = nomount_genl_clear_rules,
+        .dumpit = NULL,
+        NM_OPS_POLICY(nomount_genl_policy)
+    },
+    {
+        .cmd = NOMOUNT_CMD_ADD_UID,
+        .flags = GENL_ADMIN_PERM,
+        .doit = nomount_genl_add_uid,
+        .dumpit = NULL,
+        NM_OPS_POLICY(nomount_genl_policy)
+    },
+    {
+        .cmd = NOMOUNT_CMD_DEL_UID,
+        .flags = GENL_ADMIN_PERM,
+        .doit = nomount_genl_del_uid,
+        .dumpit = NULL,
+        NM_OPS_POLICY(nomount_genl_policy)
+    },
+    {
+        .cmd = NOMOUNT_CMD_GET_LIST,
+        .flags = GENL_ADMIN_PERM,
+        .doit = NULL,
+        .dumpit = nomount_genl_dump_rules,
+        NM_OPS_POLICY(nomount_genl_policy)
+    },
+    {
+        .cmd = NOMOUNT_CMD_GET_VERSION,
+        .flags = GENL_ADMIN_PERM,
+        .doit = nomount_genl_get_version,
+        .dumpit = NULL,
+        NM_OPS_POLICY(nomount_genl_policy)
+    },
+};
+
+static struct genl_family nomount_genl_family = {
+    .name = NOMOUNT_GENL_NAME,
+    .version = NOMOUNT_GENL_VERSION,
+    .maxattr = NOMOUNT_ATTR_MAX,
+    NM_FAMILY_POLICY(nomount_genl_policy)
+    .netnsok = true,
+    .module = THIS_MODULE,
+    .ops = nomount_genl_ops,
+    .n_ops = ARRAY_SIZE(nomount_genl_ops),
 };
 
 static int __init nomount_init(void) {
@@ -1508,9 +1559,9 @@ static int __init nomount_init(void) {
         return -ENOMEM;
     }
 
-    ret = misc_register(&nomount_device);
+    ret = genl_register_family(&nomount_genl_family);
     if (ret) {
-        nm_err("Failed to register misc device '/dev/nomount' (err: %d)\n", ret);
+        nm_err("Failed to register Generic Netlink family (err: %d)\n", ret);
         kmem_cache_destroy(nm_rule_cachep);
         kmem_cache_destroy(nm_dir_cachep);
         kmem_cache_destroy(nm_uid_cachep);
