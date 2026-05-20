@@ -54,7 +54,6 @@ bool nomount_is_uid_blocked(uid_t uid) {
 static __always_inline bool __nomount_should_skip(void) {
     if (unlikely(nomount_num_rules() == 0 && nomount_num_dirs() == 0)) return true;
     if (unlikely(!in_task() || in_nmi() || oops_in_progress)) return true;
-    if (unlikely(nm_is_recursive())) return true;
     if (unlikely(current->flags & (PF_KTHREAD | PF_EXITING))) return true;
     if (unlikely(!hash_empty(nomount_uid_ht))) {
         if (unlikely(nomount_is_uid_blocked(current_uid().val))) return true;
@@ -167,7 +166,6 @@ static char *nomount_build_path_from_pwd(const char *rel_name, size_t name_len, 
 static void nomount_drop_vpath_cache(const char *path_str, bool is_dir)
 {
     struct path path;
-    nm_enter();
     if (kern_path(path_str, 0, &path) == 0) {
         if (is_dir) {
             d_invalidate(path.dentry);
@@ -176,7 +174,6 @@ static void nomount_drop_vpath_cache(const char *path_str, bool is_dir)
         }
         path_put(&path);
     }
-    nm_exit();
 }
 
 /**
@@ -251,7 +248,6 @@ char *nomount_handle_dpath(const struct path *path, char *buf, int buflen)
     if (unlikely(IS_ERR_OR_NULL(path) || !path->dentry || !path->dentry->d_inode)) return NULL;
     if (unlikely(nomount_num_rules() == 0)) return NULL;
 
-    nm_enter();
     rcu_read_lock();
     rule = nomount_get_rule_by_ino(path->dentry->d_inode);
 
@@ -263,13 +259,11 @@ char *nomount_handle_dpath(const struct path *path, char *buf, int buflen)
             res -= len;
             memcpy(res, rule->virtual_path, len);
             rcu_read_unlock();
-            nm_exit();
             return res;
         }
     }
 
     rcu_read_unlock();
-    nm_exit();
     return NULL;
 }
 
@@ -331,12 +325,10 @@ int nomount_allow_access(struct inode *inode, int mask)
  */
 struct filename *nomount_getname_hook(struct filename *name)
 {
-    struct nomount_rule *rule, *recheck;
-    char *abs_path = NULL, *rp_copy = NULL;
-    const char *check_name;
-    const char *s, *last_slash;
+    struct nomount_rule *rule;
+    char *abs_path = NULL, *name_buffer;
+    const char *check_name, *s, *last_slash;
     size_t name_len, b_len, r_len;
-    struct filename *new_name;
     bool basename_match = false;
     u32 b_hash;
 
@@ -420,50 +412,15 @@ struct filename *nomount_getname_hook(struct filename *name)
     rcu_read_unlock();
 
     if (likely(rule)) {
-        struct path zpath;
-        bool is_zombie = false;
-
-        nm_enter();
-        if (kern_path(rule->real_path, LOOKUP_FOLLOW, &zpath) != 0) {
-            is_zombie = true;
-        } else {
-            path_put(&zpath);
-        }
-        nm_exit();
-
-        if (unlikely(is_zombie)) {
-            nm_debug("Zombie rule ignored: %s is currently missing\n", rule->real_path);
-        } else {
-            rp_copy = __getname();
-            if (likely(rp_copy)) {
-                rcu_read_lock();
-                recheck = nomount_get_rule_by_path(check_name, r_len);
-                if (likely(recheck && recheck == rule)) {
-                    memcpy(rp_copy, rule->real_path, rule->rp_len + 1);
-                } else {
-                    __putname(rp_copy);
-                    rp_copy = NULL;
-                }
-                rcu_read_unlock();
-            }
-        }
+        /* cast to char* because name->name is const char* */
+        name_buffer = (char *)name->name;
+        memcpy(name_buffer, rule->real_path, rule->rp_len);
+        name_buffer[rule->rp_len] = '\0';
+        nm_debug("Redirected: %s -> %s\n", check_name, rule->real_path);
     }
 
     if (unlikely(abs_path))
         __putname(abs_path);
-
-    if (unlikely(rp_copy)) {
-        new_name = getname_kernel(rp_copy);
-        __putname(rp_copy);
-
-        if (likely(!IS_ERR(new_name))) {
-            new_name->uptr = name->uptr;
-            new_name->aname = name->aname;
-            putname(name);
-            nm_debug("Redirected: %s -> %s\n", check_name, rule->real_path);
-            return new_name;
-        }
-    }
 
     return name;
 }
@@ -489,8 +446,6 @@ void nomount_vfs_inject_dir(struct file *file, struct dir_context *ctx)
 
     if (!dir_inode || __nomount_should_skip()) return;
     if (unlikely(nomount_num_dirs() == 0)) return;
-
-    nm_enter();
 
     if (ctx->pos >= nomount_magic_pos && ctx->pos < nomount_magic_pos + 100000) {
         v_index = (unsigned long)(ctx->pos - nomount_magic_pos);
@@ -522,7 +477,6 @@ void nomount_vfs_inject_dir(struct file *file, struct dir_context *ctx)
     }
 
     up_read(&nomount_dirs_rwsem);
-    nm_exit();
 }
 
 /**
@@ -559,14 +513,12 @@ static void __nomount_collect_parents(const char *real_path, size_t len)
 
         *slash = '\0';
 
-        nm_enter();
         if (likely(kern_path(p, LOOKUP_FOLLOW, &kp) == 0)) {
             p_inode = d_backing_inode(kp.dentry);
             p_ino = p_inode->i_ino;
             mode = p_inode->i_mode;
             priv = ((mode & S_IXOTH) == 0);
             path_put(&kp);
-            nm_exit();
 
             {
                 struct nomount_dir_node *curr;
@@ -603,8 +555,6 @@ static void __nomount_collect_parents(const char *real_path, size_t len)
                     atomic_inc(&nm_active_dirs);
                 }
             }
-        } else {
-            nm_exit();
         }
     }
     __putname(path_tmp);
@@ -1020,9 +970,7 @@ bool nomount_spoof_mmap_metadata(struct inode *inode, dev_t *dev, unsigned long 
 int nomount_handle_getattr(int ret, const struct path *path, struct kstat *stat)
 {
     if (likely(ret == 0) && !__nomount_should_skip()) {
-        nm_enter();
         nomount_spoof_stat(path, stat);
-        nm_exit();
     }
     return ret;
 }
@@ -1087,8 +1035,6 @@ static int nomount_genl_add_rule(struct sk_buff *skb, struct genl_info *info)
     rule->real_ino = 0;
     rule->real_dev = 0;
 
-    nm_enter();
-
     if (kern_path(r_path, LOOKUP_FOLLOW, &r_path_struct_main) == 0) {
         struct inode *r_inode = d_backing_inode(r_path_struct_main.dentry);
         rule->real_ino = r_inode->i_ino;
@@ -1115,9 +1061,6 @@ static int nomount_genl_add_rule(struct sk_buff *skb, struct genl_info *info)
     } else {
         rule->v_ino = (unsigned long)hash;
     }
-
-    nm_exit();
-
 
     mutex_lock(&nomount_write_mutex);
     down_write(&nomount_dirs_rwsem);
