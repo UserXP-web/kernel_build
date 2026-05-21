@@ -1183,6 +1183,7 @@ static int nomount_genl_del_rule(struct sk_buff *skb, struct genl_info *info)
     struct nomount_dir_node *dir;
     struct nomount_rule *rule, *tmp_r;
     struct nomount_child_name *child, *tmp_c;
+    struct hlist_node *tmp_d;
 
     if (info->attrs[NOMOUNT_ATTR_PAYLOAD]) {
         struct nlattr *attr = info->attrs[NOMOUNT_ATTR_PAYLOAD];
@@ -1227,7 +1228,6 @@ static int nomount_genl_del_rule(struct sk_buff *skb, struct genl_info *info)
         kfree(child);
     }
 
-    struct hlist_node *tmp_d;
     hlist_for_each_entry_safe(dir, tmp_d, &d_victims, node) {
         kfree(dir->dir_path);
         kmem_cache_free(nm_dir_cachep, dir);
