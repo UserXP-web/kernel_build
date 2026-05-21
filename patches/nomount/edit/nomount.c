@@ -617,6 +617,7 @@ static int nomount_generate_virtual_topology(struct nomount_rule *rule)
     char *slashes_v[32], *slashes_r[32];
     u32 h_inter;
     bool inter_exists;
+    struct nomount_rule *ex;
     unsigned long inherited_dev = 0, inherited_fs_type = 0;
     int child_len, cur_v_len, cur_r_len, current_flags;
     int p_count = 0, err = 0;
@@ -665,7 +666,6 @@ static int nomount_generate_virtual_topology(struct nomount_rule *rule)
 
         h_inter = full_name_hash(NULL, v_tmp, cur_v_len);
         inter_exists = false;
-        struct nomount_rule *ex;
 
         hash_for_each_possible(nomount_rules_by_vpath, ex, vpath_node, h_inter) {
             if (ex->vp_len == cur_v_len && memcmp(ex->virtual_path, v_tmp, cur_v_len) == 0) {
