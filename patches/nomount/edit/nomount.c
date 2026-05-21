@@ -616,6 +616,7 @@ static int nomount_generate_virtual_topology(struct nomount_rule *rule)
     struct nomount_rule *pending_rules[32];
     char *slashes_v[32], *slashes_r[32];
     u32 h_inter;
+    bool inter_exists;
     unsigned long inherited_dev = 0, inherited_fs_type = 0;
     int child_len, cur_v_len, cur_r_len, current_flags;
     int p_count = 0, err = 0;
@@ -663,7 +664,7 @@ static int nomount_generate_virtual_topology(struct nomount_rule *rule)
         p_count++;
 
         h_inter = full_name_hash(NULL, v_tmp, cur_v_len);
-        bool inter_exists = false;
+        inter_exists = false;
         struct nomount_rule *ex;
 
         hash_for_each_possible(nomount_rules_by_vpath, ex, vpath_node, h_inter) {
@@ -1223,6 +1224,8 @@ static int nomount_genl_del_rule(struct sk_buff *skb, struct genl_info *info)
     HLIST_HEAD(d_victims);
     struct nomount_rule *rule, *tmp_r;
     struct nomount_child_name *child, *tmp_c;
+    struct nomount_dir_node *dir;
+    struct hlist_node *tmp_d;
 
     if (info->attrs[NOMOUNT_ATTR_PAYLOAD]) {
         struct nlattr *attr = info->attrs[NOMOUNT_ATTR_PAYLOAD];
@@ -1267,8 +1270,6 @@ static int nomount_genl_del_rule(struct sk_buff *skb, struct genl_info *info)
         kfree(child);
     }
 
-    struct nomount_dir_node *dir;
-    struct hlist_node *tmp_d;
     hlist_for_each_entry_safe(dir, tmp_d, &d_victims, node) {
         kfree(dir->dir_path);
         kmem_cache_free(nm_dir_cachep, dir);
