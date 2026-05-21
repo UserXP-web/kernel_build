@@ -1,0 +1,130 @@
+#ifndef _LINUX_NOMOUNT_H
+#define _LINUX_NOMOUNT_H
+
+#include <linux/types.h>
+#include <linux/list.h>
+#include <linux/hashtable.h>
+#include <linux/atomic.h>
+#include <linux/rwsem.h>
+#include <net/sock.h>
+#include <net/genetlink.h>
+#include <linux/version.h>
+
+#define NOMOUNT_VERSION    2
+#define NOMOUNT_HASH_BITS  12
+#define NM_CHILD_HASH_BITS   6
+#define NOMOUNT_UID_HASH_BITS 4
+#define NM_FLAG_IS_DIR        (1 << 7)
+
+static DEFINE_HASHTABLE(nomount_dirs_ht,           NOMOUNT_HASH_BITS);
+static DEFINE_HASHTABLE(nomount_rules_by_vpath,    NOMOUNT_HASH_BITS);
+static DEFINE_HASHTABLE(nomount_rules_by_real_ino, NOMOUNT_HASH_BITS);
+static DEFINE_HASHTABLE(nomount_rules_by_v_ino,    NOMOUNT_HASH_BITS);
+static DEFINE_HASHTABLE(nomount_basenames_ht,      NOMOUNT_HASH_BITS);
+static DEFINE_HASHTABLE(nomount_private_dirs_ht,   NOMOUNT_HASH_BITS);
+static DEFINE_HASHTABLE(nomount_uid_ht,            NOMOUNT_UID_HASH_BITS);
+static LIST_HEAD(nomount_rules_list);
+static DEFINE_MUTEX(nomount_write_mutex);
+static DECLARE_RWSEM(nomount_dirs_rwsem);
+
+
+struct nomount_rule {
+    struct hlist_node v_ino_node;
+    struct hlist_node real_ino_node;
+    struct hlist_node vpath_node;
+    struct hlist_node basename_node;
+    struct list_head list;
+    char *virtual_path;
+    char *real_path;
+    const char *basename;
+    unsigned long v_ino;
+    unsigned long real_ino;
+    long v_fs_type;
+    dev_t v_dev;
+    dev_t real_dev;
+    u32 v_hash;
+    u32 flags;
+    u16 vp_len;
+    u16 rp_len;
+    u16 b_len;
+};
+
+struct nomount_dir_node {
+    struct hlist_node node;
+    struct hlist_node private_hash_node;
+    struct list_head private_list;
+    struct list_head children_names;
+    DECLARE_HASHTABLE(children_ht, NM_CHILD_HASH_BITS);
+    char *dir_path;
+    u32 dir_hash;
+    unsigned long dir_ino;
+    u32 next_child_index;
+    u16 dir_path_len;
+    bool is_private;
+};
+
+struct nomount_child_name {
+    struct list_head list;
+    struct hlist_node hash_node;
+    unsigned long fake_ino;
+    u32 v_index;
+    u16 name_len;
+    u8 d_type;
+    char name[256];
+};
+
+struct nomount_uid_node {
+    struct hlist_node node;
+    uid_t uid;
+};
+
+/* ========================================================================= */
+/* NETLINK GENERIC PROTOCOL DEFINITIONS */
+/* ========================================================================= */
+
+#define NOMOUNT_GENL_NAME "nomount"
+#define NOMOUNT_GENL_VERSION 1
+
+/* Commands */
+enum {
+    NOMOUNT_CMD_UNSPEC = 0,
+    NOMOUNT_CMD_GET_VERSION,
+    NOMOUNT_CMD_ADD_RULE,
+    NOMOUNT_CMD_DEL_RULE,
+    NOMOUNT_CMD_CLEAR_ALL,
+    NOMOUNT_CMD_ADD_UID,
+    NOMOUNT_CMD_DEL_UID,
+    NOMOUNT_CMD_GET_LIST,
+    __NOMOUNT_CMD_MAX,
+};
+#define NOMOUNT_CMD_MAX (__NOMOUNT_CMD_MAX - 1)
+
+/* Attributes */
+enum {
+    NOMOUNT_ATTR_UNSPEC = 0,
+    NOMOUNT_ATTR_VIRTUAL_PATH,  /* String (NLA_NUL_STRING) */
+    NOMOUNT_ATTR_REAL_PATH,     /* String (NLA_NUL_STRING) */
+    NOMOUNT_ATTR_FLAGS,         /* u32 (NLA_U32) */
+    NOMOUNT_ATTR_UID,           /* u32 (NLA_U32) */
+    NOMOUNT_ATTR_VERSION,       /* u32 (NLA_U32) */
+    NOMOUNT_ATTR_PAYLOAD,       /* Binary payload for GET_LIST (NLA_BINARY) */
+    __NOMOUNT_ATTR_MAX,
+};
+
+#define NOMOUNT_ATTR_MAX (__NOMOUNT_ATTR_MAX - 1)
+
+/* * Compat macros for Generic Netlink Policy API changes.
+ * Linux 4.20 moved the policy pointer from genl_ops to genl_family.
+ */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 2, 0)
+#define NM_OPS_POLICY(p)    .policy = (p),
+#define NM_FAMILY_POLICY(p)
+#else
+#define NM_OPS_POLICY(p)
+#define NM_FAMILY_POLICY(p) .policy = (p),
+#endif
+
+/* Application UID start */
+#define AID_APP_START 10000
+
+#endif /* _LINUX_NOMOUNT_H */
