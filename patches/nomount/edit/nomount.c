@@ -1180,6 +1180,7 @@ static int nomount_genl_del_rule(struct sk_buff *skb, struct genl_info *info)
     LIST_HEAD(r_victims);
     LIST_HEAD(c_victims);
     HLIST_HEAD(d_victims);
+    struct nomount_dir_node *dir;
     struct nomount_rule *rule, *tmp_r;
     struct nomount_child_name *child, *tmp_c;
 
@@ -1226,7 +1227,6 @@ static int nomount_genl_del_rule(struct sk_buff *skb, struct genl_info *info)
         kfree(child);
     }
 
-    struct nomount_dir_node *dir;
     struct hlist_node *tmp_d;
     hlist_for_each_entry_safe(dir, tmp_d, &d_victims, node) {
         kfree(dir->dir_path);
