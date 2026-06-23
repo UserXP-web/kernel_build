@@ -542,8 +542,8 @@ jobs:
           fi
           
           # 1. Παραγωγή του .config (Αντικαταστήστε το garnet_defconfig αν το repo σας έχει π.χ. vendor/garnet_defconfig)
-          #make O=out "${MAKE_FLAGS[@]}" vendor/garnet_GKI.config
-          make O=out "${MAKE_FLAGS[@]}" ${{ inputs.BUILD_CONFIG_file }}
+          make O=out "${MAKE_FLAGS[@]}" vendor/garnet_GKI.config
+          #make O=out "${MAKE_FLAGS[@]}" ${{ inputs.BUILD_CONFIG_file }}
 
           # =======================================================
           # Απενεργοποίηση των stack protector configs (SED Patches για αποφυγή των Linker Errors) στο παραγόμενο .config
@@ -559,6 +559,12 @@ jobs:
           echo "CONFIG_INIT_ON_ALLOC_DEFAULT_ON=y" >> out/.config
           echo "CONFIG_INIT_ON_FREE_DEFAULT_ON=y" >> out/.config
           # =======================================================
+          echo "CONFIG_INIT_ON_ALLOC_DEFAULT_ON=y" >> out/.config
+          echo "CONFIG_INIT_ON_FREE_DEFAULT_ON=y" >> out/.config
+          echo "CONFIG_CRYPTO_SHA256=y" >> out/.config
+          echo "CONFIG_CRYPTO_SHA512=y" >> out/.config
+          echo "CONFIG_ANDROID_BINDER_IPC=y" >> out/.config
+
           
           # 2. Compile τον πυρήνα και τα DTBs/DTBO
           #make O=out "${MAKE_FLAGS[@]}" -j$(nproc --all) Image.gz dtbo.img
