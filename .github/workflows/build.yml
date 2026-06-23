@@ -16,7 +16,7 @@ env:
   manifest_url: 'https://github.com/UserXP-web/kernel_build'
   manifest_branch: 'main'
   manifest_folder: 'common' # sm7435
-  lz4kd: true
+  lz4kd: false
   ZIP_PATH: ''
   KERNEL_VERSION: '5.10'
   SUB_LEVEL: '236'
@@ -436,50 +436,6 @@ jobs:
         echo "NAME_INFO=$NAME_INFO" >> $GITHUB_ENV
         echo "^^^^^^^^^^^^^^^^^^^^^^ NAME_INFO=$NAME_INFO"
 
-        cat >> "$CONFIG_FILE" << 'EOF'
-        CONFIG_REKERNEL=y
-        CONFIG_REKERNEL_NETWORK=y
-        CONFIG_BPF_STREAM_PARSER=y		  
-        CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
-        CONFIG_NETFILTER_XT_SET=y
-        CONFIG_IP6_NF_NAT=y
-        CONFIG_IP6_NF_TARGET_MASQUERADE=y          
-        CONFIG_KSU_SUSFS_SUS_KSTAT_REDIRECT=y
-        CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
-        CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y   
-        # Optional kernel config placeholders
-        # Networking Configuration
-        CONFIG_IP_NF_TARGET_TTL=y
-        CONFIG_IP6_NF_TARGET_HL=y
-        CONFIG_IP6_NF_MATCH_HL=y   
-        # BBR TCP Congestion Control
-        CONFIG_TCP_CONG_ADVANCED=y
-        CONFIG_TCP_CONG_BBR=y
-        CONFIG_NET_SCH_FQ=y
-        # CONFIG_TCP_CONG_BIC is not set
-        # CONFIG_TCP_CONG_WESTWOOD is not set
-        # CONFIG_TCP_CONG_HTCP is not set   
-        # IPSet Support
-        CONFIG_IP_SET=y
-        CONFIG_IP_SET_MAX=65534
-        CONFIG_IP_SET_BITMAP_IP=y
-        CONFIG_IP_SET_BITMAP_IPMAC=y
-        CONFIG_IP_SET_BITMAP_PORT=y
-        CONFIG_IP_SET_HASH_IP=y
-        CONFIG_IP_SET_HASH_IPMARK=y
-        CONFIG_IP_SET_HASH_IPPORT=y
-        CONFIG_IP_SET_HASH_IPPORTIP=y
-        CONFIG_IP_SET_HASH_IPPORTNET=y
-        CONFIG_IP_SET_HASH_IPMAC=y
-        CONFIG_IP_SET_HASH_MAC=y
-        CONFIG_IP_SET_HASH_NETPORTNET=y
-        CONFIG_IP_SET_HASH_NET=y
-        CONFIG_IP_SET_HASH_NETNET=y
-        CONFIG_IP_SET_HASH_NETPORT=y
-        CONFIG_IP_SET_HASH_NETIFACE=y
-        CONFIG_IP_SET_LIST_SET=y
-        EOF
-
     - name: 📝 clang (old)...
       if: false
       run: |
@@ -532,6 +488,9 @@ jobs:
         # Εισαγωγή του σωστού header στην αρχή του αρχείου ssg-iosched.c
         sed -i '2i #include <linux/blk-cgroup.h>' ./android/$SUB_DIR/block/ssg-iosched.c
         sed -i '3i #include <linux/cgroup.h>' ./android/$SUB_DIR/block/ssg-iosched.c
+
+        # Αντικατάσταση της προβληματικής γραμμής με ασφαλή έλεγχο #ifdef
+        sed -i 's/rqi->blkg = blkg_lookup(css_to_blkcg(blkcg_css()), rq->q);/#ifdef CONFIG_BLK_CGROUP\n\t\trqi->blkg = blkg_lookup(css_to_blkcg(blkcg_css()), rq->q);\n#else\n\t\trqi->blkg = NULL;\n#endif/g' ./android/$SUB_DIR/block/ssg-iosched.c
 
     - name: Extract the actual sub-version number
       run: |
