@@ -35,7 +35,7 @@ on:
           - "EvoX"
           - "zylhdrXP"
           - "default"
-        default: "UserXP"
+        default: "zylhdrXP"
       BUILD_CONFIG_file:
         description: 'Customized build.config file'
         required: true
@@ -253,7 +253,7 @@ jobs:
         echo "BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> $GITHUB_ENV
 
         #######################################################
-        #git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-6.4.1.git gcc64
+        git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-6.4.1.git gcc64
         #######################################################
         
     - name: Setup Kernel Cache
@@ -542,8 +542,8 @@ jobs:
           fi
           
           # 1. Παραγωγή του .config (Αντικαταστήστε το garnet_defconfig αν το repo σας έχει π.χ. vendor/garnet_defconfig)
-          make O=out "${MAKE_FLAGS[@]}" vendor/garnet_GKI.config
-          #make O=out "${MAKE_FLAGS[@]}" ${{ inputs.BUILD_CONFIG_file }}
+          #make O=out "${MAKE_FLAGS[@]}" vendor/garnet_GKI.config
+          make O=out "${MAKE_FLAGS[@]}" ${{ inputs.BUILD_CONFIG_file }}
 
           # =======================================================
           # Απενεργοποίηση των stack protector configs (SED Patches για αποφυγή των Linker Errors) στο παραγόμενο .config
