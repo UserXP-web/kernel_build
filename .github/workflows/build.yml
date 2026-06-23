@@ -526,7 +526,8 @@ jobs:
         SUB_DIR=${{ env.manifest_folder }}
         # Χρήση sed για την αυτόματη εισαγωγή του header αρχείου στη γραμμή 2 του gf_spi.c
         sed -i '2i #include <linux/pinctrl/consumer.h>' ./android/$SUB_DIR/drivers/input/fingerprint/goodix_fod_G3S/gf_spi.c
-
+        # Εισαγωγή του σωστού header στη 2η γραμμή του αρχείου platform.c
+        sed -i '2i #include <linux/pinctrl/consumer.h>' ./android/$SUB_DIR/drivers/input/fingerprint/goodix_fod_G3S/platform.c
 
 
     - name: Extract the actual sub-version number
