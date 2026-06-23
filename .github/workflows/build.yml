@@ -564,7 +564,8 @@ jobs:
           make O=out "${MAKE_FLAGS[@]}" vendor/garnet_GKI.config
           
           # 2. Compile τον πυρήνα και τα DTBs/DTBO
-          make O=out "${MAKE_FLAGS[@]}" -j$(nproc --all) Image.gz dtbo.img
+          #make O=out "${MAKE_FLAGS[@]}" -j$(nproc --all) Image.gz dtbo.img
+          make O=out "${MAKE_FLAGS[@]}" -j$(nproc --all) Image.gz
   
 
 
