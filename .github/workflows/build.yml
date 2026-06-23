@@ -229,9 +229,15 @@ jobs:
         
         # Λήψη AOSP GCC (Απαραίτητο για non-GKI 5.10 ως cross-assembler)
         echo 4
-        git clone https://googlesource.com -b ndk-release-r21 --depth=1 gcc64
+        #git clone https://googlesource.com -b ndk-release-r21 --depth=1 gcc64
         echo 5
-        git clone https://googlesource.com -b ndk-release-r21 --depth=1 gcc32
+        #git clone https://googlesource.com -b ndk-release-r21 --depth=1 gcc32
+
+        # 2. Λήψη και εξαγωγή του GCC 64-bit (AArch64) από το επίσημο πλήρες URL της Google
+        curl -L "https://googlesource.com" -o gcc64.tar.gz
+        tar -xzf gcc64.tar.gz -C gcc64/
+        rm gcc64.tar.gz
+        
         echo "ok"
 
     - name: ⬇️ Download toolchain
