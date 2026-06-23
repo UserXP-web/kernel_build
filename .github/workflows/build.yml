@@ -542,9 +542,12 @@ jobs:
           fi
           
           # 1. Παραγωγή του .config (Αντικαταστήστε το garnet_defconfig αν το repo σας έχει π.χ. vendor/garnet_defconfig)
+          #make O=out "${MAKE_FLAGS[@]}" vendor/garnet_GKI.config
+          # 1. Δημιουργία του βασικού GKI configuration
+          make O=out "${MAKE_FLAGS[@]}" gki_defconfig
+          # 2. Συγχώνευση (Merge) του προφίλ της Xiaomi πάνω στο βασικό config
           make O=out "${MAKE_FLAGS[@]}" vendor/garnet_GKI.config
-          #make O=out "${MAKE_FLAGS[@]}" ${{ inputs.BUILD_CONFIG_file }}
-
+  
           # =======================================================
           # Απενεργοποίηση των stack protector configs (SED Patches για αποφυγή των Linker Errors) στο παραγόμενο .config
           sed -i 's/CONFIG_STACKPROTECTOR=y/# CONFIG_STACKPROTECTOR is not set/g' out/.config
