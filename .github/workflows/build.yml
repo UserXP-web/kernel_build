@@ -166,8 +166,29 @@ jobs:
         
         # Λήψη επίσημου AOSP Clang (r487747c ή νεότερο, κατάλληλο για kernel 5.10)
         mkdir clang
-        curl -LO https://googlesource.com
-        tar -C clang/ -xf clang-r487747c.tar.gz
+        #curl -LO https://googlesource.com
+        #tar -C clang/ -xf clang-r487747c.tar.gz
+
+
+
+        #if [[ "$clang_version" = "latest" ]]; then
+            clang_version=$(curl -L https://android.googlesource.com/kernel/common/+/refs/heads/android-mainline/build.config.constants | grep -Eo 'r[0-9]{6}[a-z]?[0-9]?')
+            echo clang_version=$clang_version | tee -a $GITHUB_ENV
+        #fi
+        aosp_clang_branch=$(
+            case "$clang_version" in
+            r365631c ) echo android11-release;;
+            r383902 | r416183b) echo master-kernel-build-2021 ;;
+            r450784e) echo master-kernel-build-2022 ;;
+            r487747c) echo main-kernel-build-2023 ;;
+            *) echo main ;;
+            esac
+        )
+        #curl -L https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/$aosp_clang_branch/clang-$clang_version.tar.gz | tar xz -C aosp-clang
+        curl -L https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/$aosp_clang_branch/clang-$clang_version.tar.gz
+        tar -C clang/ -xf clang-$clang_version.tar.gz
+
+
         
         # Λήψη AOSP GCC (Απαραίτητο για non-GKI 5.10 ως cross-assembler)
         git clone https://googlesource.com -b ndk-release-r21 --depth=1 gcc64
