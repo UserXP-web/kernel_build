@@ -234,9 +234,6 @@ jobs:
         echo 5
         #git clone https://googlesource.com -b ndk-release-r21 --depth=1 gcc32
 
-        # 2. Λήψη και εξαγωγή του GCC 64-bit (AArch64) από το επίσημο πλήρες URL της Google
-        git clone https://github.com --depth=1 gcc64
-        
         echo "ok"
 
     - name: ⬇️ Download toolchain
@@ -256,7 +253,7 @@ jobs:
         echo "BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> $GITHUB_ENV
 
         #######################################################
-        git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-6.4.1.git gcc
+        git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-6.4.1.git gcc64
         #######################################################
         
         # AnyKernel3
