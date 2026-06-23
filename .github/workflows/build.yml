@@ -161,15 +161,17 @@ jobs:
 
     - name: Fetch Toolchains (AOSP Clang & Proton GCC)
       run: |
-        mkdir -p toolchains/clang
+        mkdir -p toolchains
         cd toolchains
         
-        # 1. Λήψη με πεζό -o για ρητό ορισμό του ονόματος αρχείου (clang.tgz)
-        curl -L https://googlesource.com -o clang.tgz
+        # 1. Λήψη του επίσημου AOSP Clang μέσω git clone (Αποφυγή σφαλμάτων curl/tar)
+        # Χρησιμοποιούμε το branch του Android U (r487747c) που είναι ιδανικό για τον Kernel 5.10 του garnet
+        git clone https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 -b master-kernel --depth=1 clang-repo
         
-        # 2. Εξαγωγή του αρχείου στον φάκελο clang/
-        tar -xf clang.tgz -C clang/
-        rm clang.tgz # Διαγραφή του αρχείου για εξοικονόμηση χώρου
+        # Μετακινούμε τη συγκεκριμένη έκδοση clang στον φάκελο clang/ για να ταιριάζει με τα paths του build
+        mv clang-repo/clang-r487747c clang
+        rm -rf clang-repo # Καθαρισμός του υπολοίπου repo για εξοικονόμηση χώρου
+        
 
 
 
