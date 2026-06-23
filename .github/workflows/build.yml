@@ -545,11 +545,16 @@ jobs:
           make O=out "${MAKE_FLAGS[@]}" vendor/garnet_GKI.config
           #make O=out "${MAKE_FLAGS[@]}" ${{ inputs.BUILD_CONFIG_file }}
 
+          # =======================================================
           # Απενεργοποίηση των stack protector configs (SED Patches για αποφυγή των Linker Errors) στο παραγόμενο .config
           sed -i 's/CONFIG_STACKPROTECTOR=y/# CONFIG_STACKPROTECTOR is not set/g' out/.config
           sed -i 's/CONFIG_STACKPROTECTOR_STRONG=y/# CONFIG_STACKPROTECTOR_STRONG is not set/g' out/.config
           # Απενεργοποίηση του προβληματικού MTD OOPS driver
           sed -i 's/CONFIG_MTD_OOPS=y/# CONFIG_MTD_OOPS is not set/g' out/.config
+          # 2. Ενεργοποίηση AOSP Init Security Requirements
+          sed -i 's/# CONFIG_INIT_ON_ALLOC_DEFAULT_ON is not set/CONFIG_INIT_ON_ALLOC_DEFAULT_ON=y/g' out/.config
+          sed -i 's/# CONFIG_INIT_ON_FREE_DEFAULT_ON is not set/CONFIG_INIT_ON_FREE_DEFAULT_ON=y/g' out/.config
+          # =======================================================
           
           # 2. Compile τον πυρήνα και τα DTBs/DTBO
           #make O=out "${MAKE_FLAGS[@]}" -j$(nproc --all) Image.gz dtbo.img
@@ -624,7 +629,7 @@ jobs:
         # Ορίζουμε το block partition της συσκευής (Το τυπικό για σύγχρονα Xiaomi/Qualcomm)
         #sed -i 's|block=/dev/block/by-name/boot;|block=/dev/block/by-name/boot;|g' anykernel.sh
         ZIP_NAME=${{ steps.set_name.outputs.ARTIFACT_NAME }}-AnyKernel3.zip
-        zip -r "$ZIP_NAME" ./* # zip -r9 ../garnet-kernel-flashable.zip *
+        zip -r "$ZIP_NAME" ./*             # zip -r9 ../garnet-kernel-flashable.zip *
         echo "ZIP_PATH=$GITHUB_WORKSPACE/AnyKernel3/$ZIP_NAME" >> $GITHUB_ENV
 
     - name: 🧠 Boot.img
