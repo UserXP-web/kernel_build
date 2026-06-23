@@ -551,9 +551,13 @@ jobs:
           sed -i 's/CONFIG_STACKPROTECTOR_STRONG=y/# CONFIG_STACKPROTECTOR_STRONG is not set/g' out/.config
           # Απενεργοποίηση του προβληματικού MTD OOPS driver
           sed -i 's/CONFIG_MTD_OOPS=y/# CONFIG_MTD_OOPS is not set/g' out/.config
-          # 2. Ενεργοποίηση AOSP Init Security Requirements
-          sed -i 's/# CONFIG_INIT_ON_ALLOC_DEFAULT_ON is not set/CONFIG_INIT_ON_ALLOC_DEFAULT_ON=y/g' out/.config
-          sed -i 's/# CONFIG_INIT_ON_FREE_DEFAULT_ON is not set/CONFIG_INIT_ON_FREE_DEFAULT_ON=y/g' out/.config
+          # 3. Ενεργοποίηση AOSP Init Security Requirements (CONFIG_INIT_ON_ALLOC/FREE)
+          # Καθαρίζουμε τυχόν υπάρχουσες απενεργοποιημένες αναφορές
+          sed -i '/CONFIG_INIT_ON_ALLOC_DEFAULT_ON/d' out/.config
+          sed -i '/CONFIG_INIT_ON_FREE_DEFAULT_ON/d' out/.config
+          # Εισαγωγή των σωστών flags για LineageOS 23 / Android 15+
+          echo "CONFIG_INIT_ON_ALLOC_DEFAULT_ON=y" >> out/.config
+          echo "CONFIG_INIT_ON_FREE_DEFAULT_ON=y" >> out/.config
           # =======================================================
           
           # 2. Compile τον πυρήνα και τα DTBs/DTBO
