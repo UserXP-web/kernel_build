@@ -495,16 +495,6 @@ jobs:
         # Αντικατάσταση της προβληματικής γραμμής με ασφαλή έλεγχο #ifdef
         sed -i 's/rqi->blkg = blkg_lookup(css_to_blkcg(blkcg_css()), rq->q);/#ifdef CONFIG_BLK_CGROUP\n\t\trqi->blkg = blkg_lookup(css_to_blkcg(blkcg_css()), rq->q);\n#else\n\t\trqi->blkg = NULL;\n#endif/g' ./android/$SUB_DIR/block/ssg-iosched.c
 
-    - name: Disable Stack Protector to fix Linker Error
-      run: |
-        SUB_DIR=${{ env.manifest_folder }}
-        cd ./android/$SUB_DIR # kernel
-        # Απενεργοποίηση των stack protector configs στο παραγόμενο .config
-        sed -i 's/CONFIG_STACKPROTECTOR=y/# CONFIG_STACKPROTECTOR is not set/g' out/.config
-        sed -i 's/CONFIG_STACKPROTECTOR_STRONG=y/# CONFIG_STACKPROTECTOR_STRONG is not set/g' out/.config
-        # Απενεργοποίηση του προβληματικού MTD OOPS driver
-        sed -i 's/CONFIG_MTD_OOPS=y/# CONFIG_MTD_OOPS is not set/g' out/.config
-
 
     - name: Extract the actual sub-version number
       run: |
@@ -557,6 +547,12 @@ jobs:
           # 1. Παραγωγή του .config (Αντικαταστήστε το garnet_defconfig αν το repo σας έχει π.χ. vendor/garnet_defconfig)
           make O=out "${MAKE_FLAGS[@]}" vendor/garnet_GKI.config
           #make O=out "${MAKE_FLAGS[@]}" ${{ inputs.BUILD_CONFIG_file }}
+
+          # Απενεργοποίηση των stack protector configs (SED Patches για αποφυγή των Linker Errors) στο παραγόμενο .config
+          sed -i 's/CONFIG_STACKPROTECTOR=y/# CONFIG_STACKPROTECTOR is not set/g' out/.config
+          sed -i 's/CONFIG_STACKPROTECTOR_STRONG=y/# CONFIG_STACKPROTECTOR_STRONG is not set/g' out/.config
+          # Απενεργοποίηση του προβληματικού MTD OOPS driver
+          sed -i 's/CONFIG_MTD_OOPS=y/# CONFIG_MTD_OOPS is not set/g' out/.config
           
           # 2. Compile τον πυρήνα και τα DTBs/DTBO
           #make O=out "${MAKE_FLAGS[@]}" -j$(nproc --all) Image.gz dtbo.img
