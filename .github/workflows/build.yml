@@ -543,33 +543,27 @@ jobs:
           
           # 1. Παραγωγή του .config (Αντικαταστήστε το garnet_defconfig αν το repo σας έχει π.χ. vendor/garnet_defconfig)
           #make O=out "${MAKE_FLAGS[@]}" vendor/garnet_GKI.config
-          # 1. Δημιουργία του βασικού GKI configuration
+          # 1. Δημιουργία του βασικού GKI configuration + Συγχώνευση (Merge) του προφίλ της Xiaomi πάνω στο βασικό config
           make O=out "${MAKE_FLAGS[@]}" gki_defconfig
-          # 2. Συγχώνευση (Merge) του προφίλ της Xiaomi πάνω στο βασικό config
           make O=out "${MAKE_FLAGS[@]}" vendor/garnet_GKI.config
   
           # =======================================================
-          # Απενεργοποίηση των stack protector configs (SED Patches για αποφυγή των Linker Errors) στο παραγόμενο .config
+          # 2. Επίλυση Linker Errors (Stack Protector & MTD_OOPS)
           sed -i 's/CONFIG_STACKPROTECTOR=y/# CONFIG_STACKPROTECTOR is not set/g' out/.config
           sed -i 's/CONFIG_STACKPROTECTOR_STRONG=y/# CONFIG_STACKPROTECTOR_STRONG is not set/g' out/.config
-          # Απενεργοποίηση του προβληματικού MTD OOPS driver
           sed -i 's/CONFIG_MTD_OOPS=y/# CONFIG_MTD_OOPS is not set/g' out/.config
-          # 3. Ενεργοποίηση AOSP Init Security Requirements (CONFIG_INIT_ON_ALLOC/FREE)
-          # Καθαρίζουμε τυχόν υπάρχουσες απενεργοποιημένες αναφορές
-          sed -i '/CONFIG_INIT_ON_ALLOC_DEFAULT_ON/d' out/.config
-          sed -i '/CONFIG_INIT_ON_FREE_DEFAULT_ON/d' out/.config
-          # Εισαγωγή των σωστών flags για LineageOS 23 / Android 15+
-          echo "CONFIG_INIT_ON_ALLOC_DEFAULT_ON=y" >> out/.config
-          echo "CONFIG_INIT_ON_FREE_DEFAULT_ON=y" >> out/.config
-          # =======================================================
+          # 3. ΜΕΤΑΤΡΟΠΗ ΣΕ NON-GKI (Αναγκάζουμε τους drivers να γίνουν Built-in)
+          # Μετατρέπουμε όλα τα Modules (=m) σε εγγενή στοιχεία του πυρήνα (=y)
+          sed -i 's/=m/=y/g' out/.config                 
+          # 4. Ενεργοποίηση Απαιτήσεων Ασφαλείας του AOSP Init (LineageOS 23 / Android 16)
           echo "CONFIG_INIT_ON_ALLOC_DEFAULT_ON=y" >> out/.config
           echo "CONFIG_INIT_ON_FREE_DEFAULT_ON=y" >> out/.config
           echo "CONFIG_CRYPTO_SHA256=y" >> out/.config
           echo "CONFIG_CRYPTO_SHA512=y" >> out/.config
           echo "CONFIG_ANDROID_BINDER_IPC=y" >> out/.config
-
+          # =======================================================
           
-          # 2. Compile τον πυρήνα και τα DTBs/DTBO
+          # 5. Compile τον πυρήνα και τα DTBs/DTBO
           #make O=out "${MAKE_FLAGS[@]}" -j$(nproc --all) Image.gz dtbo.img
           make O=out "${MAKE_FLAGS[@]}" -j$(nproc --all) Image.gz
   
