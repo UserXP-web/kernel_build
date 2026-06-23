@@ -169,11 +169,12 @@ jobs:
 
 
 
-
+        echo 1
         #if [[ "$clang_version" = "latest" ]]; then
             clang_version=$(curl -L https://android.googlesource.com/kernel/common/+/refs/heads/android-mainline/build.config.constants | grep -Eo 'r[0-9]{6}[a-z]?[0-9]?')
-            echo clang_version=$clang_version | tee -a $GITHUB_ENV
+            #echo clang_version=$clang_version | tee -a $GITHUB_ENV
         #fi
+        echo 2
         aosp_clang_branch=$(
             case "$clang_version" in
             r365631c ) echo android11-release;;
@@ -184,6 +185,7 @@ jobs:
             esac
         )
         mkdir -p clang
+        echo 3
         curl -L https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/$aosp_clang_branch/clang-$clang_version.tar.gz | tar xz -C clang
         #curl -L https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/$aosp_clang_branch/clang-$clang_version.tar.gz
         #tar -C clang/ -xf clang-$clang_version.tar.gz
