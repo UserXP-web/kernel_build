@@ -45,7 +45,7 @@ on:
         description: 'Use Make as build method'
         type: boolean
         required: true
-        default: false
+        default: true
 
       add_zeromount:
         description: 'Add ZERoMount support (main)'
@@ -84,6 +84,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      CCACHE_COMPILERCHECK: "%compiler% -v"
+      CCACHE_MAXSIZE: "3G"
+      CCACHE_DIR: "${{ github.workspace }}/.ccache"
+
     steps:    
     - name: Checkout
       uses: actions/checkout@v4
@@ -93,14 +98,13 @@ jobs:
 
     - name: "🚀 Maximize Build Space"
       #if: ${{ env.KERNEL_VERSION == '5.10' || env.KERNEL_VERSION == '5.15' }}
-      uses: easimon/maximize-build-space@master
+      uses: easimon/minimize-disk-space@v1.0.0
       with:
-        root-reserve-mb: 8192
-        temp-reserve-mb: 4096
-        remove-dotnet: 'true'
-        remove-android: 'true'
-        remove-haskell: 'true'
-        remove-codeql: 'true'
+        root-reserve-mb: 2048
+        swap-size-mb: 1024
+        remove-dotnet: true
+        remove-android: true
+        remove-haskell: true
 
     - name: 💾 Recover Ccache
       if: true
@@ -115,11 +119,11 @@ jobs:
         #  ccache-gki-${{ env.SUB_LEVEL }}-
         #  ccache-gki-
 
-    - name: 📦 Build Environment (Cache & Install Dependencies)
+    - name: 📦 Build Environment (Cache & Install Compiler Dependencies)
       run: |
-        sudo apt update
-        sudo apt install -y ccache python3 git curl build-essential libssl-dev bison flex rsync libelf-dev dwarves clang libc++-dev libc++abi-dev device-tree-compiler bc g++
-        #sudo apt install -y curl ccache libelf-dev build-essential flex bison libssl-dev libncurses-dev liblz4-tool zlib1g-dev libxml2-utils rsync unzip gawk dos2unix
+        sudo apt-get update
+        sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf lib32readline-dev lib32z1-dev libelf-dev liblz4-tool libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev
+        #sudo apt install -y ccache python3 git curl build-essential libssl-dev bison flex rsync libelf-dev dwarves clang libc++-dev libc++abi-dev device-tree-compiler bc g++
 
     - name: ⚙️ Configuration Ccache
       if: true
@@ -154,7 +158,22 @@ jobs:
             echo "ℹ️ 'repo' command exist."
         fi
 
+    - name: Fetch Toolchains (AOSP Clang & Proton GCC)
+      run: |
+        mkdir toolchains
+        cd toolchains
+        
+        # Λήψη επίσημου AOSP Clang (r487747c ή νεότερο, κατάλληλο για kernel 5.10)
+        mkdir clang
+        curl -LO https://googlesource.com
+        tar -C clang/ -xf clang-r487747c.tar.gz
+        
+        # Λήψη AOSP GCC (Απαραίτητο για non-GKI 5.10 ως cross-assembler)
+        git clone https://googlesource.com -b ndk-release-r21 --depth=1 gcc64
+        git clone https://googlesource.com -b ndk-release-r21 --depth=1 gcc32
+
     - name: ⬇️ Download toolchain
+      if: false
       run: |
         AOSP_MIRROR=https://android.googlesource.com
         BRANCH=main-kernel-build-2024
@@ -175,6 +194,14 @@ jobs:
         
         # AnyKernel3
         git clone https://github.com/WildPlusKernel/AnyKernel3.git -b "gki-2.0"
+
+    - name: Setup Kernel Cache
+      uses: actions/cache@v4
+      with:
+        path: .ccache
+        key: garnet-kernel-ccache-${{ github.sha }}
+        restore-keys: |
+          garnet-kernel-ccache-
 
     - name: ⬇️ Clone Kernel Source
       run: |
@@ -390,6 +417,7 @@ jobs:
         EOF
 
     - name: 📝 clang...
+      if: false
       run: |
         cd android/prebuilts-master/clang/host/linux-x86        
         clangVersion=${{ inputs.clang_VERSION }} # r383902 r416183b r584948b --- r563880b
@@ -437,15 +465,49 @@ jobs:
         ROOT=${{ env.manifest_folder }}
         
         if ${{ inputs.BUILD_METHOD_MAKE }} == "true" ]; then
-          #export PATH="$GITHUB_WORKSPACE/android/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin:$PATH"
-          #export PATH="/usr/lib/ccache:$PATH"
-          #sudo apt install libelf-dev
-          sudo apt-get install lld
-          sudo apt-get install llvm
-          cd $ROOT
-          B_CONFIG=${{ inputs.BUILD_CONFIG_file }}
-          make -j$(nproc --all) LLVM_IAS=1 LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out gki_defconfig all
-          #make -j$(nproc --all) LLVM_IAS=1 LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out "$B_CONFIG" all
+
+          cd $ROOT # kernel
+          
+          # Ορισμός διαδρομών των compilers
+          CLANG_BIN="${{ github.workspace }}/toolchains/clang/bin"
+          GCC64_BIN="${{ github.workspace }}/toolchains/gcc64/bin"
+          GCC32_BIN="${{ github.workspace }}/toolchains/gcc32/bin"
+          export PATH="$CLANG_BIN:$GCC64_BIN:$GCC32_BIN:$PATH"
+          
+          # Σημαίες μεταγλώττισης (Clang + LLVM Utilities)
+          MAKE_FLAGS=(
+              ARCH=arm64
+              SUBARCH=arm64
+              CROSS_COMPILE=aarch64-linux-android-
+              CROSS_COMPILE_ARM32=arm-linux-androideabi-
+              CC=clang
+              CLANG_TRIPLE=aarch64-linux-gnu-
+              LD=ld.lld
+              AR=llvm-ar
+              NM=llvm-nm
+              OBJCOPY=llvm-objcopy
+              OBJDUMP=llvm-objdump
+              STRIP=llvm-strip
+          )
+          
+          if [ -d "${{ env.CCACHE_DIR }}" ]; then
+              export USE_CCACHE=1
+              MAKE_FLAGS+=( CC="ccache clang" )
+          fi
+          
+          # 1. Παραγωγή του .config (Αντικαταστήστε το garnet_defconfig αν το repo σας έχει π.χ. vendor/garnet_defconfig)
+          make O=out "${MAKE_FLAGS[@]}" garnet_defconfig
+          
+          # 2. Compile τον πυρήνα και τα DTBs/DTBO
+          make O=out "${MAKE_FLAGS[@]}" -j$(nproc --all) Image.gz dtbo.img
+  
+
+
+          #sudo apt-get install lld
+          #sudo apt-get install llvm
+          #cd $ROOT
+          #B_CONFIG=${{ inputs.BUILD_CONFIG_file }}
+          #make -j$(nproc --all) LLVM_IAS=1 LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out gki_defconfig all
         else
           B_CONFIG=$ROOT/${{ inputs.BUILD_CONFIG_file }}
           sed -i 's/BUILD_SYSTEM_DLKM=1/BUILD_SYSTEM_DLKM=0/' ./$B_CONFIG
