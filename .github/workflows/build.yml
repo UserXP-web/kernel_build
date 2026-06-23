@@ -472,11 +472,14 @@ jobs:
 
 
 
-    - name: Bypass Goodix Werror
+    - name: Bypass Goodix Werror (Fix Goodix Fingerprint Int Conversion Error)
       run: |
         SUB_DIR=${{ env.manifest_folder }}
         # Προσθέτει flags στο Makefile του driver για να μην μετατρέπονται τα warnings σε σφάλματα
-        echo "CFLAGS_gf_spi.o := -Wno-implicit-function-declaration -Wno-error" >> ./android/$SUB_DIR/drivers/input/fingerprint/goodix_fod_G3S/Makefile
+        echo "CFLAGS_gf_spi.o := -Wno-implicit-function-declaration -Wno-int-conversion -Wno-error" >> ./android/$SUB_DIR/drivers/input/fingerprint/goodix_fod_G3S/Makefile
+        # Αναγκάζει τον compiler να αγνοήσει τα int-conversion σφάλματα στον συγκεκριμένο driver
+        echo "CFLAGS_platform.o := -Wno-int-conversion -Wno-error" >> ./android/$SUB_DIR/drivers/input/fingerprint/goodix_fod_G3S/Makefile
+
     - name: Patch Goodix Fingerprint Driver Error
       run: |
         SUB_DIR=${{ env.manifest_folder }}
@@ -491,6 +494,7 @@ jobs:
 
         # Αντικατάσταση της προβληματικής γραμμής με ασφαλή έλεγχο #ifdef
         sed -i 's/rqi->blkg = blkg_lookup(css_to_blkcg(blkcg_css()), rq->q);/#ifdef CONFIG_BLK_CGROUP\n\t\trqi->blkg = blkg_lookup(css_to_blkcg(blkcg_css()), rq->q);\n#else\n\t\trqi->blkg = NULL;\n#endif/g' ./android/$SUB_DIR/block/ssg-iosched.c
+
 
     - name: Extract the actual sub-version number
       run: |
