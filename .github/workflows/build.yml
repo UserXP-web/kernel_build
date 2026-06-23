@@ -162,7 +162,6 @@ jobs:
     - name: 📝 clang...
       if: true
       run: |
-        cd android/prebuilts-master/clang/host/linux-x86        
         clangVersion=${{ inputs.clang_VERSION }} # r383902 r416183b r584948b --- r563880b
         clang_PATH="clang-$clangVersion"
         androidVersion="" # 12 or [empty]
@@ -175,17 +174,14 @@ jobs:
         fi
         echo "Downloading... $url2"
         if [ "${clang_PATH}" == "clang-r563880c" ]; then clang_PATH="clang-r563880b"; fi # <<<<<<<<<<<<<<<<======================
+        clang_PATH="clang"
+        mkdir -p toolchains
+        cd toolchains
         mkdir -p $clang_PATH &&
         aria2c -s16 -x16 -k1M $url2 -o clang.zip &&
-        tar -xf clang.zip -C $clang_PATH #&&
-        #rm -rf clang.zip
-        echo "============================================================================================="
-        cd ${GITHUB_WORKSPACE}
-        mkdir -p ${GITHUB_WORKSPACE}/toolchains
-        mkdir -p ${GITHUB_WORKSPACE}/toolchains/clang
-        tar -xf clang.zip -C ${GITHUB_WORKSPACE}/toolchains/clang &&
+        tar -xf clang.zip -C $clang_PATH &&
         rm -rf clang.zip
-
+        echo "============================================================================================="
 
         WORKDIR="$(pwd)"
         export PATH="$WORKDIR/$clang_PATH/bin:$PATH"
@@ -481,6 +477,34 @@ jobs:
         CONFIG_IP_SET_HASH_NETIFACE=y
         CONFIG_IP_SET_LIST_SET=y
         EOF
+
+    - name: 📝 clang (old)...
+      if: false
+      run: |
+        cd android/prebuilts-master/clang/host/linux-x86        
+        clangVersion=${{ inputs.clang_VERSION }} # r383902 r416183b r584948b --- r563880b
+        clang_PATH="clang-$clangVersion"
+        androidVersion="" # 12 or [empty]
+        if [ "${clangVersion}" == "r383902" ]; then androidVersion='12'; fi        
+        echo "============================================================================================="
+        if [ "${androidVersion}" == "" ]; then
+          url2="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/mirror-goog-main-llvm-toolchain-source/clang-${clangVersion}.tar.gz"
+        else
+          url2="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android${androidVersion}-release/clang-${clangVersion}.tar.gz"
+        fi
+        echo "Downloading... $url2"
+        if [ "${clang_PATH}" == "clang-r563880c" ]; then clang_PATH="clang-r563880b"; fi # <<<<<<<<<<<<<<<<======================
+        mkdir -p $clang_PATH &&
+        aria2c -s16 -x16 -k1M $url2 -o clang.zip &&
+        tar -xf clang.zip -C $clang_PATH &&
+        rm -rf clang.zip
+        echo "============================================================================================="
+
+
+        WORKDIR="$(pwd)"
+        export PATH="$WORKDIR/$clang_PATH/bin:$PATH"
+        export PATH="/usr/lib/ccache:$PATH"
+        echo "PATH=$PATH"
 
     - name: ✅ CORRECT stupid
       run: |
