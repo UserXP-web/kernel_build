@@ -514,11 +514,18 @@ jobs:
         curl -LSs "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/correct/bootconfig.c" -o ./android/$SUB_DIR/fs/proc/bootconfig.c
 
 
+
+
+    - name: Bypass Goodix Werror
+      run: |
+        # Προσθέτει flags στο Makefile του driver για να μην μετατρέπονται τα warnings σε σφάλματα
+        echo "CFLAGS_gf_spi.o := -Wno-implicit-function-declaration -Wno-error" >> kernel/drivers/input/fingerprint/goodix_fod_G3S/Makefile
     - name: Patch Goodix Fingerprint Driver Error
       run: |
         SUB_DIR=${{ env.manifest_folder }}
         # Χρήση sed για την αυτόματη εισαγωγή του header αρχείου στη γραμμή 2 του gf_spi.c
         sed -i '2i #include <linux/pinctrl/consumer.h>' ./android/$SUB_DIR/drivers/input/fingerprint/goodix_fod_G3S/gf_spi.c
+
 
 
     - name: Extract the actual sub-version number
@@ -561,6 +568,7 @@ jobs:
               OBJCOPY=llvm-objcopy
               OBJDUMP=llvm-objdump
               STRIP=llvm-strip
+              KCFLAGS="-Wno-error -Wno-implicit-function-declaration" # <-- ΠΡΟΣΘΕΣΤΕ ΑΥΤΗ ΤΗ ΓΡΑΜΜΗ
           )
           
           if [ -d "${{ env.CCACHE_DIR }}" ]; then
