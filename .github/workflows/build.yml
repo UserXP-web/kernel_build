@@ -161,22 +161,11 @@ jobs:
 
     - name: Fetch Toolchains (AOSP Clang & Proton GCC)
       run: |
-        mkdir -p toolchains/clang
+        mkdir -p toolchains
         cd toolchains
         
-        # 1. Λήψη ΜΟΝΟ της συγκεκριμένης έκδοσης Clang (r487747c) για εξοικονόμηση χώρου και χρόνου
-        git init clang-repo
-        cd clang-repo
-        git remote add origin https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86
-        
-        # Κάνουμε fetch στοχευμένα το branch main-kernel με βάθος 1
-        git fetch --depth=1 origin main-kernel
-        git checkout FETCH_HEAD -- clang-r487747c
-        
-        # Μεταφορά των αρχείων στη σωστή τοποθεσία και καθαρισμός
-        mv clang-r487747c/* ../clang/
-        cd ..
-        rm -rf clang-repo
+        # 1. Λήψη του AOSP Clang r487747c (Android 14/U Toolchain) από σταθερό GitHub Mirror
+        git clone https://github.com -b master --depth=1 clang
         
 
 
