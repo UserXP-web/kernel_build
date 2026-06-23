@@ -164,10 +164,12 @@ jobs:
         mkdir -p toolchains/clang
         cd toolchains
         
-        # 1. Λήψη και ΣΩΣΤΗ εξαγωγή του AOSP Clang στον φάκελο clang/
-        curl -LO https://googlesource.com
-        tar -xf clang-r487747c.tar.gz -C clang/
-        rm clang-r487747c.tar.gz # Διαγραφή για εξοικονόμηση χώρου
+        # 1. Λήψη με πεζό -o για ρητό ορισμό του ονόματος αρχείου (clang.tgz)
+        curl -L https://googlesource.com -o clang.tgz
+        
+        # 2. Εξαγωγή του αρχείου στον φάκελο clang/
+        tar -xf clang.tgz -C clang/
+        rm clang.tgz # Διαγραφή του αρχείου για εξοικονόμηση χώρου
 
 
 
