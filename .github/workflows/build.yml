@@ -518,8 +518,9 @@ jobs:
 
     - name: Bypass Goodix Werror
       run: |
+        SUB_DIR=${{ env.manifest_folder }}
         # Προσθέτει flags στο Makefile του driver για να μην μετατρέπονται τα warnings σε σφάλματα
-        echo "CFLAGS_gf_spi.o := -Wno-implicit-function-declaration -Wno-error" >> kernel/drivers/input/fingerprint/goodix_fod_G3S/Makefile
+        echo "CFLAGS_gf_spi.o := -Wno-implicit-function-declaration -Wno-error" >> ./android/$SUB_DIR/drivers/input/fingerprint/goodix_fod_G3S/Makefile
     - name: Patch Goodix Fingerprint Driver Error
       run: |
         SUB_DIR=${{ env.manifest_folder }}
