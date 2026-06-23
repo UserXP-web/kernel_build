@@ -96,9 +96,10 @@ jobs:
     #- name: Cleanup
     #  uses: rokibhasansagar/slimhub_actions@main
 
-    - name: "🚀 Maximize Build Space"
+    - name: "🚀 Maximize Build Space (Maximize Runner Space)"
       #if: ${{ env.KERNEL_VERSION == '5.10' || env.KERNEL_VERSION == '5.15' }}
-      uses: easimon/minimize-disk-space@v1.0.0
+      uses: easimon/maximize-build-space@master
+      #uses: easimon/minimize-disk-space@v1.0.0      
       with:
         root-reserve-mb: 2048
         swap-size-mb: 1024
