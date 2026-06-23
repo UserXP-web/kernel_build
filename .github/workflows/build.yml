@@ -198,8 +198,11 @@ jobs:
 
         
         # Λήψη AOSP GCC (Απαραίτητο για non-GKI 5.10 ως cross-assembler)
+        echo 4
         git clone https://googlesource.com -b ndk-release-r21 --depth=1 gcc64
+        echo 5
         git clone https://googlesource.com -b ndk-release-r21 --depth=1 gcc32
+        echo "ok"
 
     - name: ⬇️ Download toolchain
       if: false
