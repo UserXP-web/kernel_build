@@ -234,9 +234,7 @@ jobs:
         #git clone https://googlesource.com -b ndk-release-r21 --depth=1 gcc32
 
         # 2. Λήψη και εξαγωγή του GCC 64-bit (AArch64) από το επίσημο πλήρες URL της Google
-        curl -L "https://googlesource.com" -o gcc64.tar.gz
-        tar -xzf gcc64.tar.gz -C gcc64/
-        rm gcc64.tar.gz
+        git clone https://github.com --depth=1 gcc64
         
         echo "ok"
 
