@@ -187,6 +187,10 @@ jobs:
         export PATH="$WORKDIR/$clang_PATH/bin:$PATH"
         export PATH="/usr/lib/ccache:$PATH"
         echo "PATH=$PATH"
+    - name: AnyKernel3
+      run: |
+        # AnyKernel3
+        git clone https://github.com/WildPlusKernel/AnyKernel3.git -b "gki-2.0"
     - name: Fetch Toolchains (AOSP Clang & Proton GCC)
       run: |
         mkdir -p toolchains
@@ -256,9 +260,6 @@ jobs:
         git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-6.4.1.git gcc64
         #######################################################
         
-        # AnyKernel3
-        git clone https://github.com/WildPlusKernel/AnyKernel3.git -b "gki-2.0"
-
     - name: Setup Kernel Cache
       uses: actions/cache@v4
       with:
