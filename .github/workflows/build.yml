@@ -171,7 +171,8 @@ jobs:
 
         echo 1
         #if [[ "$clang_version" = "latest" ]]; then
-            clang_version=$(curl -L https://android.googlesource.com/kernel/common/+/refs/heads/android-mainline/build.config.constants | grep -Eo 'r[0-9]{6}[a-z]?[0-9]?')
+            #clang_version=$(curl -L https://android.googlesource.com/kernel/common/+/refs/heads/android-mainline/build.config.constants | grep -Eo 'r[0-9]{6}[a-z]?[0-9]?')
+            clang_version=$(curl -L https://android.googlesource.com/kernel/common/+/refs/heads/android-mainline/bazel/constants.scl | grep -Eo 'r[0-9]{6}[a-z]?[0-9]?')
             #echo clang_version=$clang_version | tee -a $GITHUB_ENV
         #fi
         echo 2
