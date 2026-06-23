@@ -187,10 +187,6 @@ jobs:
         export PATH="$WORKDIR/$clang_PATH/bin:$PATH"
         export PATH="/usr/lib/ccache:$PATH"
         echo "PATH=$PATH"
-    - name: AnyKernel3
-      run: |
-        # AnyKernel3
-        git clone https://github.com/WildPlusKernel/AnyKernel3.git -b "gki-2.0"
     - name: Fetch Toolchains (AOSP Clang & Proton GCC)
       run: |
         mkdir -p toolchains
@@ -241,7 +237,7 @@ jobs:
         echo "ok"
 
     - name: ⬇️ Download toolchain
-      if: false
+      if: true
       run: |
         AOSP_MIRROR=https://android.googlesource.com
         BRANCH=main-kernel-build-2024
@@ -257,7 +253,7 @@ jobs:
         echo "BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> $GITHUB_ENV
 
         #######################################################
-        git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-6.4.1.git gcc64
+        #git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-6.4.1.git gcc64
         #######################################################
         
     - name: Setup Kernel Cache
@@ -603,19 +599,32 @@ jobs:
         echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> $GITHUB_OUTPUT
         
     - name: 📦 Package kernel
-      run: |        
+      run: |
+        # 1. Λήψη του σωστού AnyKernel3 repo και branch
+        git clone https://github.com/WildPlusKernel/AnyKernel3.git -b "gki-2.0" AnyKernel3
+
+        # 2. Αντιγραφή των παραχθέντων αρχείων του garnet μέσα στο AnyKernel3
         if ${{ inputs.BUILD_METHOD_MAKE }} == "true" ]; then
           image_path=$(find "./android/${{ env.manifest_folder }}/out/" -name "Image" | head -n 1)
           if [ -n "$image_path" ] && [ -f "$image_path" ]; then
             echo "Image file finally located at: $image_path"
             cp "$image_path" ./AnyKernel3/Image
           fi
+          image_path=$(find "./android/${{ env.manifest_folder }}/out/" -name "dtbo.img" | head -n 1)
+          if [ -n "$image_path" ] && [ -f "$image_path" ]; then
+            echo "dtbo.img file finally located at: $image_path"
+            cp "$image_path" ./AnyKernel3/dtbo.img 2>/dev/null || true
+          fi
         else
           cp ./android/out/android12-5.10/dist/Image ./AnyKernel3/
         fi
         cd AnyKernel3
+        # 3. ΠΡΟΣΑΡΜΟΓΗ ΓΙΑ NON-GKI (GARNET): Απενεργοποιούμε το generic GKI check για να επιτρέπεται το φλασάρισμα στη συσκευή σας
+        #sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel.sh
+        # Ορίζουμε το block partition της συσκευής (Το τυπικό για σύγχρονα Xiaomi/Qualcomm)
+        #sed -i 's|block=/dev/block/by-name/boot;|block=/dev/block/by-name/boot;|g' anykernel.sh
         ZIP_NAME=${{ steps.set_name.outputs.ARTIFACT_NAME }}-AnyKernel3.zip
-        zip -r "$ZIP_NAME" ./*
+        zip -r "$ZIP_NAME" ./* # zip -r9 ../garnet-kernel-flashable.zip *
         echo "ZIP_PATH=$GITHUB_WORKSPACE/AnyKernel3/$ZIP_NAME" >> $GITHUB_ENV
 
     - name: 🧠 Boot.img
