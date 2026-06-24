@@ -291,6 +291,7 @@ jobs:
         echo "✅ Kernel source code cloning complete"
 
     - name: ⚙️ Configure Kernel Options
+      if: false
       run: |
         cd android
         echo "⚙️ Configuring kernel compilation options..."
@@ -480,6 +481,7 @@ jobs:
 
 
     - name: Bypass Goodix Werror (Fix Goodix Fingerprint Int Conversion Error)
+      if: false
       run: |
         SUB_DIR=${{ env.manifest_folder }}
         # Προσθέτει flags στο Makefile του driver για να μην μετατρέπονται τα warnings σε σφάλματα
@@ -488,6 +490,7 @@ jobs:
         echo "CFLAGS_platform.o := -Wno-int-conversion -Wno-error" >> ./android/$SUB_DIR/drivers/input/fingerprint/goodix_fod_G3S/Makefile
 
     - name: Patch Goodix Fingerprint Driver Error
+      if: false
       run: |
         SUB_DIR=${{ env.manifest_folder }}
         # Χρήση sed για την αυτόματη εισαγωγή του header αρχείου στη γραμμή 2 του gf_spi.c
