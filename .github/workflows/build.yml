@@ -624,7 +624,7 @@ jobs:
 
         # Αυτόματη εύρεση και αντιγραφή όλων των .ko modules της Qualcomm
         mkdir -p AnyKernel3/modules/vendor/lib/modules
-        find kernel/out/ -name "*.ko" -exec cp {} AnyKernel3/modules/vendor/lib/modules/ \;
+        find ./android/${{ env.manifest_folder }}/out/ -name "*.ko" -exec cp {} AnyKernel3/modules/vendor/lib/modules/ \;
            
         cd AnyKernel3
        
