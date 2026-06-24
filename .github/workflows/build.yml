@@ -622,14 +622,25 @@ jobs:
           cp ./android/out/android12-5.10/dist/Image ./AnyKernel3/
         fi
 
-        # Αυτόματη εύρεση και αντιγραφή όλων των .ko modules της Qualcomm
-        mkdir -p AnyKernel3/modules/vendor/lib/modules
-        find ./android/${{ env.manifest_folder }}/out/ -name "*.ko" -exec cp {} AnyKernel3/modules/vendor/lib/modules/ \;
-           
+        # 3. ΔΗΜΙΟΥΡΓΙΑ ΤΗΣ ΣΩΣΤΗΣ ΔΟΜΗΣ ΓΙΑ VENDOR DLKM
+        # Στις AOSP ROMs του garnet, τα modules πρέπει να τοποθετηθούν στον φάκελο vendor_dlkm του zip
+        #mkdir -p AnyKernel3/modules/vendor/lib/modules
+        mkdir -p AnyKernel3/vendor_dlkm/lib/modules        
+        # Εύρεση και αντιγραφή όλων των custom .ko αρχείων (Display, Touch, κλπ.)
+        find ./android/${{ env.manifest_folder }}/out/ -name "*.ko" -exec cp {} AnyKernel3/vendor_dlkm/lib/modules/ \;
+
         cd AnyKernel3
+
+        # 4. ΠΑΡΑΚΑΜΨΗ ΤΩΝ ΠΕΡΙΟΡΙΣΜΩΝ ΣΤΟ ANYKERNEL.SH
+        # Απενεργοποίηση του device check για non-GKI συμβατότητα
+        sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel.sh
+        
+        # Ενεργοποιούμε το split_boot για να κάνει το AnyKernel3 unpack και το vendor_boot
+        sed -i 's/split_boot=0/split_boot=1/g' anykernel.sh 2>/dev/null || true
+        
+        # Ορίζουμε ρητά τη συμπίεση των modules
+        sed -i 's/ramdisk_compression=auto;/ramdisk_compression=auto;\nvendor_ramdisk_compression=auto;/g' anykernel.sh
        
-        # ΠΡΟΣΑΡΜΟΓΗ ΓΙΑ NON-GKI (GARNET): Απενεργοποιούμε το generic GKI check για να επιτρέπεται το φλασάρισμα στη συσκευή σας
-        #sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel.sh
         # Ορίζουμε το block partition της συσκευής (Το τυπικό για σύγχρονα Xiaomi/Qualcomm)
         #sed -i 's|block=/dev/block/by-name/boot;|block=/dev/block/by-name/boot;|g' anykernel.sh
         
