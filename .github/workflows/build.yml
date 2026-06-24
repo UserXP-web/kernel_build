@@ -511,7 +511,15 @@ jobs:
         
         if ${{ inputs.BUILD_METHOD_MAKE }} == "true" ]; then
           cd $ROOT # kernel
+
+          CLANG_BIN="${{ github.workspace }}/toolchains/clang/bin"
+          GCC64_BIN="${{ github.workspace }}/toolchains/gcc64/bin"
+          GCC32_BIN="${{ github.workspace }}/toolchains/gcc32/bin"
+          export PATH="$CLANG_BIN:$GCC64_BIN:$GCC32_BIN:$PATH"
           
+          export ARCH=arm64
+          export SUBARCH=arm64
+
           # Αλλάζουμε το CLANG_TRIPLE σε aarch64-linux-android- για να λυθεί το __stack_chk_guard
           MAKE_FLAGS=(
               ARCH=arm64
