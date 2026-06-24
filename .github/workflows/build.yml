@@ -573,7 +573,12 @@ jobs:
           # 3. Εφαρμογή Κρίσιμων Ρυθμίσεων (LTO, CFI, Localversion, Binder βάσει Matrixx 11.9)
           sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-gki"/g' out/.config
           sed -i -E 's/CONFIG_(LTO|CFI).*//g' out/.config
-          echo -e "CONFIG_LTO_CLANG_FULL=y\nCONFIG_CFI_CLANG=y\nCONFIG_CFI_CLANG_SHADOW=y" >> out/.config
+          
+          #echo -e "CONFIG_LTO_CLANG_FULL=y\nCONFIG_CFI_CLANG=y\nCONFIG_CFI_CLANG_SHADOW=y" >> out/.config
+          # Κρατάμε το LTO αλλά απενεργοποιούμε το CFI για να παρακάμψουμε το Clang Version Mismatch
+          echo "CONFIG_LTO_CLANG_FULL=y" >> out/.config
+          sed -i 's/CONFIG_CFI_CLANG=y/# CONFIG_CFI_CLANG is not set/g' out/.config
+          
           sed -i '/CONFIG_ANDROID_BINDER_DEVICES/d' out/.config
           echo 'CONFIG_ANDROID_BINDER_DEVICES="binder,hwbinder,vndbinder"' >> out/.config
 
