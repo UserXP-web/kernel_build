@@ -536,30 +536,39 @@ jobs:
           # 1. Παραγωγή του συνδυαστικού Config
           make O=out "${MAKE_FLAGS[@]}" gki_defconfig
           make O=out "${MAKE_FLAGS[@]}" vendor/garnet_GKI.config
+
+          # 2. ΜΕΤΑΤΡΟΠΗ ΣΕ NON-GKI (Μετατροπή Modules σε Built-in)
+          sed -i 's/=m/=y/g' out/.config
           
-          # 2. ΟΡΙΣΤΙΚΗ ΑΠΕΝΕΡΓΟΠΟΙΗΣΗ ΜΟΝΟ ΤΟΥ MTD_OOPS
+          # 3. ΟΡΙΣΤΙΚΗ ΑΠΕΝΕΡΓΟΠΟΙΗΣΗ ΜΟΝΟ ΤΟΥ MTD_OOPS
           sed -i '/CONFIG_MTD_OOPS/d' out/.config
           echo "# CONFIG_MTD_OOPS is not set" >> out/.config
-          
-          # Κρατάμε το STACKPROTECTOR ενεργό (Απαραίτητο για το boot της ROM)
-          
-          # 3. Ενεργοποίηση Απαιτήσεων Ασφαλείας του AOSP Init (Android 15)
+
+          # 4. Ενεργοποίηση Απαιτήσεων Ασφαλείας του AOSP Init (Android 15)
           echo "CONFIG_INIT_ON_ALLOC_DEFAULT_ON=y" >> out/.config
           echo "CONFIG_INIT_ON_FREE_DEFAULT_ON=y" >> out/.config
           echo "CONFIG_CRYPTO_SHA256=y" >> out/.config
           echo "CONFIG_CRYPTO_SHA512=y" >> out/.config
           echo "CONFIG_ANDROID_BINDER_IPC=y" >> out/.config
-          # ΤΑ ΚΡΥΦΑ FLAGS ΓΙΑ ΑΟΣΡ BOOT (Matrixx / Lineage)
+
+          # 5. ΤΑ ΚΡΥΦΑ FLAGS ΓΙΑ AOSP BOOT (BPF, MEMCG & BINDER)
+          # Καθαρίζουμε παλιές αναφορές για να μην γίνουν overwrite
+          sed -i '/CONFIG_CGROUPS/d' out/.config
+          sed -i '/CONFIG_MEMCG/d' out/.config
+          sed -i '/CONFIG_CGROUP_BPF/d' out/.config
+          sed -i '/CONFIG_BPF_SYSCALL/d' out/.config
+          sed -i '/CONFIG_ANDROID_BINDER_DEVICES/d' out/.config  
+          # Εισαγωγή των κρίσιμων AOSP παραμέτρων
           echo "CONFIG_CGROUPS=y" >> out/.config
           echo "CONFIG_MEMCG=y" >> out/.config
           echo "CONFIG_CGROUP_BPF=y" >> out/.config
           echo "CONFIG_BPF_SYSCALL=y" >> out/.config
           echo "CONFIG_ANDROID_BINDER_DEVICES=\"binder,hwbinder,vndbinder,vndbinder-garnet\"" >> out/.config
-
-          # 4. Κλείδωμα config
+          
+          # 6. Κλείδωμα config
           make O=out "${MAKE_FLAGS[@]}" olddefconfig
           
-          # 5. Τελικό Compile (Χτίζουμε και τα Modules)
+          # 7. Τελικό Compile (Χτίζουμε και τα Modules)
           make O=out "${MAKE_FLAGS[@]}" -j$(nproc --all) Image.gz modules
 
           #=========================================================================================================
