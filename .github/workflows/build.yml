@@ -540,33 +540,39 @@ jobs:
               export USE_CCACHE=1
               MAKE_FLAGS+=( CC="ccache clang" )
           fi
-          
-          # 1. Παραγωγή του .config (Αντικαταστήστε το garnet_defconfig αν το repo σας έχει π.χ. vendor/garnet_defconfig)
-          #make O=out "${MAKE_FLAGS[@]}" vendor/garnet_GKI.config
-          # 1. Δημιουργία του βασικού GKI configuration + Συγχώνευση (Merge) του προφίλ της Xiaomi πάνω στο βασικό config
+
+          #=========================================================================================================
+          # 1. Παραγωγή του συνδυαστικού Config (Google GKI Base + Xiaomi Device Core)
           make O=out "${MAKE_FLAGS[@]}" gki_defconfig
           make O=out "${MAKE_FLAGS[@]}" vendor/garnet_GKI.config
-  
-          # =======================================================
-          # 2. Επίλυση Linker Errors (Stack Protector & MTD_OOPS)
-          sed -i 's/CONFIG_STACKPROTECTOR=y/# CONFIG_STACKPROTECTOR is not set/g' out/.config
-          sed -i 's/CONFIG_STACKPROTECTOR_STRONG=y/# CONFIG_STACKPROTECTOR_STRONG is not set/g' out/.config
-          sed -i 's/CONFIG_MTD_OOPS=y/# CONFIG_MTD_OOPS is not set/g' out/.config
-          # 3. ΜΕΤΑΤΡΟΠΗ ΣΕ NON-GKI (Αναγκάζουμε τους drivers να γίνουν Built-in)
-          # Μετατρέπουμε όλα τα Modules (=m) σε εγγενή στοιχεία του πυρήνα (=y)
-          sed -i 's/=m/=y/g' out/.config                 
+          
+          # 2. ΜΕΤΑΤΡΟΠΗ ΣΕ NON-GKI (Μετατροπή Modules σε Built-in)
+          sed -i 's/=m/=y/g' out/.config
+          
+          # 3. ΟΡΙΣΤΙΚΗ ΑΠΕΝΕΡΓΟΠΟΙΗΣΗ ΤΩΝ ΠΡΟΒΛΗΜΑΤΙΚΩΝ CONFIGS
+          # Χρησιμοποιούμε το 'd' για διαγραφή και το 'echo' για καθαρό un-set
+          sed -i '/CONFIG_MTD_OOPS/d' out/.config
+          sed -i '/CONFIG_STACKPROTECTOR/d' out/.config
+          echo "# CONFIG_MTD_OOPS is not set" >> out/.config
+          echo "# CONFIG_STACKPROTECTOR is not set" >> out/.config
+          echo "# CONFIG_STACKPROTECTOR_STRONG is not set" >> out/.config
+          
           # 4. Ενεργοποίηση Απαιτήσεων Ασφαλείας του AOSP Init (LineageOS 23 / Android 16)
           echo "CONFIG_INIT_ON_ALLOC_DEFAULT_ON=y" >> out/.config
           echo "CONFIG_INIT_ON_FREE_DEFAULT_ON=y" >> out/.config
           echo "CONFIG_CRYPTO_SHA256=y" >> out/.config
           echo "CONFIG_CRYPTO_SHA512=y" >> out/.config
           echo "CONFIG_ANDROID_BINDER_IPC=y" >> out/.config
-          # =======================================================
           
-          # 5. Compile τον πυρήνα και τα DTBs/DTBO
+          # 5. ΥΠΟΧΡΕΩΤΙΚΟ ΚΛΕΙΔΩΜΑ ΤΟΥ ΝΕΟΥ CONFIG
+          # Αυτό αναγκάζει τον πυρήνα να δεχτεί τις αλλαγές μας χωρίς να επαναφέρει τον MTD_OOPS
+          make O=out "${MAKE_FLAGS[@]}" olddefconfig
+          
+          # 6. Τελικό Compile
           #make O=out "${MAKE_FLAGS[@]}" -j$(nproc --all) Image.gz dtbo.img
           make O=out "${MAKE_FLAGS[@]}" -j$(nproc --all) Image.gz
-  
+          #=========================================================================================================
+ 
 
 
           #sudo apt-get install lld
