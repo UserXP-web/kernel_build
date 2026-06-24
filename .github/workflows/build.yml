@@ -549,7 +549,14 @@ jobs:
           echo "CONFIG_CRYPTO_SHA256=y" >> out/.config
           echo "CONFIG_CRYPTO_SHA512=y" >> out/.config
           echo "CONFIG_ANDROID_BINDER_IPC=y" >> out/.config
-          
+          # ΤΑ ΚΡΥΦΑ FLAGS ΓΙΑ ΑΟΣΡ BOOT (Matrixx / Lineage)
+          echo "CONFIG_CGROUPS=y" >> out/.config
+          echo "CONFIG_MEMCG=y" >> out/.config
+          echo "CONFIG_CGROUP_BPF=y" >> out/.config
+          echo "CONFIG_BPF_SYSCALL=y" >> out/.config
+          echo "CONFIG_ANDROID_BINDER_DEVICES=\"binder,hwbinder,vndbinder,vndbinder-garnet\"" >> out/.config
+
+
           # 4. Κλείδωμα config
           make O=out "${MAKE_FLAGS[@]}" olddefconfig
           
