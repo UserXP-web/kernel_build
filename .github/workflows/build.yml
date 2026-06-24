@@ -510,23 +510,15 @@ jobs:
         ROOT=${{ env.manifest_folder }}
         
         if ${{ inputs.BUILD_METHOD_MAKE }} == "true" ]; then
-
           cd $ROOT # kernel
           
-          # Ορισμός διαδρομών των compilers
-          CLANG_BIN="${{ github.workspace }}/toolchains/clang/bin"
-          GCC64_BIN="${{ github.workspace }}/toolchains/gcc64/bin"
-          GCC32_BIN="${{ github.workspace }}/toolchains/gcc32/bin"
-          export PATH="$CLANG_BIN:$GCC64_BIN:$GCC32_BIN:$PATH"
-          
-          # Σημαίες μεταγλώττισης (Clang + LLVM Utilities)
+          # Αλλάζουμε το CLANG_TRIPLE σε aarch64-linux-android- για να λυθεί το __stack_chk_guard
           MAKE_FLAGS=(
               ARCH=arm64
-              SUBARCH=arm64
               CROSS_COMPILE=aarch64-linux-android-
               CROSS_COMPILE_ARM32=arm-linux-androideabi-
               CC=clang
-              CLANG_TRIPLE=aarch64-linux-gnu-
+              CLANG_TRIPLE=aarch64-linux-android-
               LD=ld.lld
               AR=llvm-ar
               NM=llvm-nm
@@ -535,42 +527,35 @@ jobs:
               STRIP=llvm-strip
               KCFLAGS="-Wno-error -Wno-implicit-function-declaration" # <-- ΠΡΟΣΘΕΣΤΕ ΑΥΤΗ ΤΗ ΓΡΑΜΜΗ
           )
-          
-          if [ -d "${{ env.CCACHE_DIR }}" ]; then
-              export USE_CCACHE=1
-              MAKE_FLAGS+=( CC="ccache clang" )
-          fi
+          #if [ -d "${{ env.CCACHE_DIR }}" ]; then
+          #    export USE_CCACHE=1
+          #    MAKE_FLAGS+=( CC="ccache clang" )
+          #fi
 
           #=========================================================================================================
-          # 1. Παραγωγή του συνδυαστικού Config (Google GKI Base + Xiaomi Device Core)
+          # 1. Παραγωγή του συνδυαστικού Config
           make O=out "${MAKE_FLAGS[@]}" gki_defconfig
           make O=out "${MAKE_FLAGS[@]}" vendor/garnet_GKI.config
           
-          # 2. ΜΕΤΑΤΡΟΠΗ ΣΕ NON-GKI (Μετατροπή Modules σε Built-in)
-          sed -i 's/=m/=y/g' out/.config
-          
-          # 3. ΟΡΙΣΤΙΚΗ ΑΠΕΝΕΡΓΟΠΟΙΗΣΗ ΤΩΝ ΠΡΟΒΛΗΜΑΤΙΚΩΝ CONFIGS
-          # Χρησιμοποιούμε το 'd' για διαγραφή και το 'echo' για καθαρό un-set
+          # 2. ΟΡΙΣΤΙΚΗ ΑΠΕΝΕΡΓΟΠΟΙΗΣΗ ΜΟΝΟ ΤΟΥ MTD_OOPS
           sed -i '/CONFIG_MTD_OOPS/d' out/.config
-          sed -i '/CONFIG_STACKPROTECTOR/d' out/.config
           echo "# CONFIG_MTD_OOPS is not set" >> out/.config
-          echo "# CONFIG_STACKPROTECTOR is not set" >> out/.config
-          echo "# CONFIG_STACKPROTECTOR_STRONG is not set" >> out/.config
           
-          # 4. Ενεργοποίηση Απαιτήσεων Ασφαλείας του AOSP Init (LineageOS 23 / Android 16)
+          # Κρατάμε το STACKPROTECTOR ενεργό (Απαραίτητο για το boot της ROM)
+          
+          # 3. Ενεργοποίηση Απαιτήσεων Ασφαλείας του AOSP Init (Android 15)
           echo "CONFIG_INIT_ON_ALLOC_DEFAULT_ON=y" >> out/.config
           echo "CONFIG_INIT_ON_FREE_DEFAULT_ON=y" >> out/.config
           echo "CONFIG_CRYPTO_SHA256=y" >> out/.config
           echo "CONFIG_CRYPTO_SHA512=y" >> out/.config
           echo "CONFIG_ANDROID_BINDER_IPC=y" >> out/.config
           
-          # 5. ΥΠΟΧΡΕΩΤΙΚΟ ΚΛΕΙΔΩΜΑ ΤΟΥ ΝΕΟΥ CONFIG
-          # Αυτό αναγκάζει τον πυρήνα να δεχτεί τις αλλαγές μας χωρίς να επαναφέρει τον MTD_OOPS
+          # 4. Κλείδωμα config
           make O=out "${MAKE_FLAGS[@]}" olddefconfig
           
-          # 6. Τελικό Compile
-          #make O=out "${MAKE_FLAGS[@]}" -j$(nproc --all) Image.gz dtbo.img
-          make O=out "${MAKE_FLAGS[@]}" -j$(nproc --all) Image.gz
+          # 5. Τελικό Compile (Χτίζουμε και τα Modules)
+          make O=out "${MAKE_FLAGS[@]}" -j$(nproc --all) Image.gz modules
+
           #=========================================================================================================
  
 
@@ -636,11 +621,18 @@ jobs:
         else
           cp ./android/out/android12-5.10/dist/Image ./AnyKernel3/
         fi
+
+        # Αυτόματη εύρεση και αντιγραφή όλων των .ko modules της Qualcomm
+        mkdir -p AnyKernel3/modules/vendor/lib/modules
+        find kernel/out/ -name "*.ko" -exec cp {} AnyKernel3/modules/vendor/lib/modules/ \;
+           
         cd AnyKernel3
-        # 3. ΠΡΟΣΑΡΜΟΓΗ ΓΙΑ NON-GKI (GARNET): Απενεργοποιούμε το generic GKI check για να επιτρέπεται το φλασάρισμα στη συσκευή σας
+       
+        # ΠΡΟΣΑΡΜΟΓΗ ΓΙΑ NON-GKI (GARNET): Απενεργοποιούμε το generic GKI check για να επιτρέπεται το φλασάρισμα στη συσκευή σας
         #sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel.sh
         # Ορίζουμε το block partition της συσκευής (Το τυπικό για σύγχρονα Xiaomi/Qualcomm)
         #sed -i 's|block=/dev/block/by-name/boot;|block=/dev/block/by-name/boot;|g' anykernel.sh
+        
         ZIP_NAME=${{ steps.set_name.outputs.ARTIFACT_NAME }}-AnyKernel3.zip
         zip -r "$ZIP_NAME" ./*             # zip -r9 ../garnet-kernel-flashable.zip *
         echo "ZIP_PATH=$GITHUB_WORKSPACE/AnyKernel3/$ZIP_NAME" >> $GITHUB_ENV
