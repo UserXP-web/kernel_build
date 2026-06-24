@@ -162,6 +162,13 @@ jobs:
     - name: 📝 clang...
       if: true
       run: |
+        mkdir -p toolchains/clang
+        cd toolchains
+        curl -L "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+/refs/heads/main/clang-r522817/" -o clang.tar.gz
+        tar -xzf clang.tar.gz -C clang/
+        rm clang.tar.gz
+        exit 0
+        
         clangVersion=${{ inputs.clang_VERSION }} # r383902 r416183b r584948b --- r563880b
         clang_PATH="clang-$clangVersion"
         androidVersion="" # 12 or [empty]
