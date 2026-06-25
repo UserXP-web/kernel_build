@@ -526,6 +526,10 @@ jobs:
           echo "Trying..."
           cd $ROOT # kernel
 
+          # ΦΑΚΕΛΟΙ ΚΑΙ ΕΚΔΟΣΗ MAKEFILE SPOOFING
+          # Αλλάζουμε την υποέκδοση (SUBLEVEL) από 236 σε 240 στο κεντρικό Makefile
+          sed -i 's/SUBLEVEL = .*/SUBLEVEL = 240/g' Makefile
+          
           CLANG_BIN="${{ github.workspace }}/toolchains/clang/bin"
           GCC64_BIN="${{ github.workspace }}/toolchains/gcc64/bin"
           GCC32_BIN="${{ github.workspace }}/toolchains/gcc32/bin"
@@ -562,6 +566,7 @@ jobs:
             OBJCOPY=llvm-objcopy 
             OBJDUMP=llvm-objdump 
             STRIP=llvm-strip
+            LOCALVERSION="-gki-g6f1c6ad1b54f-dirty" # <-- ΡΗΤΟΣ ΕΞΑΝΑΓΚΑΣΜΟΣ COMMIT HASH
           )
 
           #=========================================================================================================
@@ -599,14 +604,14 @@ jobs:
           rm -f arch/arm64/configs/localversion*          
           # 2. Εξαναγκασμός του LOCALVERSION μέσα στο .config
           sed -i '/CONFIG_LOCALVERSION/d' out/.config
-          echo 'CONFIG_LOCALVERSION="-gki"' >> out/.config          
+          echo 'CONFIG_LOCALVERSION="-gki-g6f1c6ad1b54f-dirty"' >> out/.config          
           # 3. Εξαγωγή του LOCALVERSION και ως περιβαλλοντική μεταβλητή για το Makefile
-          export LOCALVERSION="-gki"
+          export LOCALVERSION="-gki-g6f1c6ad1b54f-dirty"
 
           
           # 6. Κλείδωμα και Compile
           make O=out "${MAKE_FLAGS[@]}" olddefconfig
-          make O=out "${MAKE_FLAGS[@]}" LOCALVERSION="-gki" -j$(nproc --all) Image.gz modules
+          make O=out "${MAKE_FLAGS[@]}" -j$(nproc --all) Image.gz modules
           #=========================================================================================================
  
 
