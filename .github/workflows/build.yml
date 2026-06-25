@@ -566,7 +566,6 @@ jobs:
             OBJCOPY=llvm-objcopy 
             OBJDUMP=llvm-objdump 
             STRIP=llvm-strip
-            LOCALVERSION="-gki-g6f1c6ad1b54f-dirty" # <-- ΡΗΤΟΣ ΕΞΑΝΑΓΚΑΣΜΟΣ COMMIT HASH
           )
 
           #=========================================================================================================
@@ -585,7 +584,6 @@ jobs:
           echo "# CONFIG_ANDROID_VERIFIED_BOOT is not set" >> out/.config
           
           # 4. Ευθυγράμμιση με Matrixx 11.9 (LTO, CFI, Shadow Call Stack & Binder)
-          sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-gki"/g' out/.config
           sed -i -E 's/CONFIG_(LTO|CFI|SHADOW_CALL_STACK).*//g' out/.config
           echo -e "CONFIG_LTO_CLANG_FULL=y\nCONFIG_CFI_CLANG=y\nCONFIG_CFI_CLANG_SHADOW=y\nCONFIG_SHADOW_CALL_STACK=y" >> out/.config
           
@@ -605,9 +603,6 @@ jobs:
           # 2. Εξαναγκασμός του LOCALVERSION μέσα στο .config
           sed -i '/CONFIG_LOCALVERSION/d' out/.config
           echo 'CONFIG_LOCALVERSION="-gki-g6f1c6ad1b54f-dirty"' >> out/.config          
-          # 3. Εξαγωγή του LOCALVERSION και ως περιβαλλοντική μεταβλητή για το Makefile
-          export LOCALVERSION="-gki-g6f1c6ad1b54f-dirty"
-
           
           # 6. Κλείδωμα και Compile
           make O=out "${MAKE_FLAGS[@]}" olddefconfig
