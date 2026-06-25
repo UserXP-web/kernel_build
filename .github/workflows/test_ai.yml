@@ -85,7 +85,11 @@ jobs:
           sed -i 's/CONFIG_ANDROID_GKI_BOOT_IMAGE=y/CONFIG_ANDROID_GKI_BOOT_IMAGE=n/g' .config
           sed -i 's/CONFIG_MODULE_SIG=y/CONFIG_MODULE_SIG=n/g' .config
           sed -i 's/CONFIG_MODULE_SIG_ALL=y/CONFIG_MODULE_SIG_ALL=n/g' .config
-          
+
+          # Force MTD configurations to be built monolithic (builtin) instead of modules
+          sed -i 's/CONFIG_MTD=m/CONFIG_MTD=y/g' .config
+          sed -i 's/CONFIG_MTD_OOPS=m/CONFIG_MTD_OOPS=y/g' .config
+
           # 3. CRITICAL FIX: Pass LLVM variables to olddefconfig too!
           export PATH="$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
           make ARCH=arm64 \
