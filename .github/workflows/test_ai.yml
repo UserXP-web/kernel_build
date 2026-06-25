@@ -51,9 +51,8 @@ jobs:
           echo "Download clang..."
           curl -L "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r522817.tar.gz" -o clang.tar.gz
           echo "Done. Extracting..."
-          tar -xzf clang.tar.gz -C clang/
+          tar -xzf clang.tar.gz -C clang/ && rm clang.tar.gz
           echo "Done."
-          rm clang.tar.gz
 
       - name: ⬇️ Clone Kernel Source
         run: |
