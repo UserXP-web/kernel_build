@@ -106,15 +106,19 @@ jobs:
           export SUBARCH=arm64
           export PATH="$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
           
-          export CC=clang
-          export LD=ld.lld
-          export AR=llvm-ar
-          export NM=llvm-nm
-          export OBJCOPY=llvm-objcopy
-          export OBJDUMP=llvm-objdump
-          export STRIP=llvm-strip
-          
-          make -j$(nproc)
+          # Force make to pass variables directly into child makefile processes
+          make -j$(nproc) \
+               ARCH=arm64 \
+               SUBARCH=arm64 \
+               CC=clang \
+               HOSTCC=clang \
+               CLANG_TRIPLE=aarch64-linux-gnu- \
+               LD=ld.lld \
+               AR=llvm-ar \
+               NM=llvm-nm \
+               OBJCOPY=llvm-objcopy \
+               OBJDUMP=llvm-objdump \
+               STRIP=llvm-strip
 
       - name: Upload Kernel Artifact
         uses: actions/upload-artifact@v4
