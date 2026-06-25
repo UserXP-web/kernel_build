@@ -72,35 +72,40 @@ jobs:
 
       - name: Merge Configs and Disable GKI Restrictions
         run: |
-          # Use your new common kernel working directory path
           cd $GITHUB_WORKSPACE/android/common
           
           make mrproper
           
-          # 1. Merge core GKI configurations with Garnet fragments
+          # 1. Merge configurations with ARCH explicitly set
           ARCH=arm64 ./scripts/kconfig/merge_config.sh -m -r \
               arch/arm64/configs/gki_defconfig \
               arch/arm64/configs/vendor/garnet_GKI.config
           
-          # 2. Modify config keys directly inside 'android/common/.config'
+          # 2. Modify config keys directly inside '.config'
           sed -i 's/CONFIG_ANDROID_GKI_BOOT_IMAGE=y/CONFIG_ANDROID_GKI_BOOT_IMAGE=n/g' .config
           sed -i 's/CONFIG_MODULE_SIG=y/CONFIG_MODULE_SIG=n/g' .config
           sed -i 's/CONFIG_MODULE_SIG_ALL=y/CONFIG_MODULE_SIG_ALL=n/g' .config
           
-          # 3. Generate definitive configuration flags using the extracted Clang path
+          # 3. CRITICAL FIX: Pass LLVM variables to olddefconfig too!
           export PATH="$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang olddefconfig
+          make ARCH=arm64 \
+               CC=clang \
+               LD=ld.lld \
+               AR=llvm-ar \
+               NM=llvm-nm \
+               OBJCOPY=llvm-objcopy \
+               OBJDUMP=llvm-objdump \
+               STRIP=llvm-strip \
+               olddefconfig
 
       - name: Compile Monolithic Kernel
         run: |
           cd $GITHUB_WORKSPACE/android/common
           
-          # Add these variables to your export block or pass them directly to make:
           export ARCH=arm64
           export SUBARCH=arm64
           export PATH="$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
           
-          # The critical fix: force the build system to use LLVM tools
           export CC=clang
           export LD=ld.lld
           export AR=llvm-ar
@@ -109,7 +114,6 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
           
-          # Then run your make command
           make -j$(nproc)
 
       - name: Upload Kernel Artifact
