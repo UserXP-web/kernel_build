@@ -592,10 +592,21 @@ jobs:
           echo "CONFIG_INIT_ON_ALLOC_DEFAULT_ON=y" >> out/.config
           echo "CONFIG_INIT_ON_FREE_DEFAULT_ON=y" >> out/.config
           echo "CONFIG_CGROUP_BPF=y" >> out/.config
+
+
+          # 1. Καθαρισμός τυχόν εξωτερικών localversion αρχείων που σπάνε το όνομα
+          rm -f localversion*
+          rm -f arch/arm64/configs/localversion*          
+          # 2. Εξαναγκασμός του LOCALVERSION μέσα στο .config
+          sed -i '/CONFIG_LOCALVERSION/d' out/.config
+          echo 'CONFIG_LOCALVERSION="-gki"' >> out/.config          
+          # 3. Εξαγωγή του LOCALVERSION και ως περιβαλλοντική μεταβλητή για το Makefile
+          export LOCALVERSION="-gki"
+
           
           # 6. Κλείδωμα και Compile
           make O=out "${MAKE_FLAGS[@]}" olddefconfig
-          make O=out "${MAKE_FLAGS[@]}" -j$(nproc --all) Image.gz modules
+          make O=out "${MAKE_FLAGS[@]}" LOCALVERSION="-gki" -j$(nproc --all) Image.gz modules
           #=========================================================================================================
  
 
