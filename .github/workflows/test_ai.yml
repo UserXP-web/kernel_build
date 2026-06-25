@@ -70,30 +70,24 @@ jobs:
   
           echo "✅ Kernel source code cloning complete"
 
-      - name: Merge Configs and Disable GKI Restrictions
+      - name: Merge Configs and Prepare Build
         run: |
           cd $GITHUB_WORKSPACE/android/common
-          
           make mrproper
           
-          # 1. Merge configurations with ARCH explicitly set
+          # 1. Merge configurations cleanly
           ARCH=arm64 ./scripts/kconfig/merge_config.sh -m -r \
               arch/arm64/configs/gki_defconfig \
               arch/arm64/configs/vendor/garnet_GKI.config
           
-          # 2. Modify config keys directly inside '.config'
-          sed -i 's/CONFIG_ANDROID_GKI_BOOT_IMAGE=y/CONFIG_ANDROID_GKI_BOOT_IMAGE=n/g' .config
-          sed -i 's/CONFIG_MODULE_SIG=y/CONFIG_MODULE_SIG=n/g' .config
-          sed -i 's/CONFIG_MODULE_SIG_ALL=y/CONFIG_MODULE_SIG_ALL=n/g' .config
-
-          # FIX 1: Override local version name directly before building
+          # 2. DO NOT change GKI variables to 'n'. Keep them default.
+          # Apply only your proven version string identifier:
           sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-gki-g6f1c6ad1b54f"/g' .config
-           
-          # Completely disable the broken MTD OOPS debug module
+          
+          # Disable ONLY the broken MTD debugging block that crashed the build earlier
           sed -i 's/CONFIG_MTD_OOPS=y/CONFIG_MTD_OOPS=n/g' .config
           sed -i 's/CONFIG_MTD_OOPS=m/CONFIG_MTD_OOPS=n/g' .config
-
-          # 3. CRITICAL FIX: Pass LLVM variables to olddefconfig too!
+          
           export PATH="$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
           make ARCH=arm64 \
                CC=clang \
@@ -152,18 +146,24 @@ jobs:
           
           # Modify explicit template parameters for Xiaomi Garnet sm7435 hardware profiles
           sed -i 's/device.name1=.*/device.name1=garnet/g' anykernel.sh
-          sed -i 's/block=.*/block=\/dev\/block\/by-name\/boot;/g' anykernel.sh
-          sed -i 's/is_slot_device=.*/is_slot_device=1;/g' anykernel.sh
-          sed -i 's/ramdisk_compression=.*/ramdisk_compression=none;/g' anykernel.sh
+          sed -i 's/BLOCK=.*/BLOCK=\/dev\/block\/by-name\/boot;/g' anykernel.sh
+          sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=1;/g' anykernel.sh
+          sed -i 's/RAMDISK_COMPRESSION=.*/RAMDISK_COMPRESSION=none;/g' anykernel.sh
           
           # Update operational functions to process clean flash writes without ramdisk unpacking
           sed -i 's/dump_boot;/split_boot;/g' anykernel.sh
           sed -i 's/write_boot;/flash_boot;/g' anykernel.sh
           
-          zip -r9 $GITHUB_WORKSPACE/Matrixx-Kernel-Garnet.zip *
+          zip -r9 $GITHUB_WORKSPACE/Matrixx-Kernel-Garnet-AnyKernel3.zip *
 
-      - name: Upload Flashable Kernel Artifact
+      - name: Upload Flashable Zip Installer
         uses: actions/upload-artifact@v4
         with:
           name: Matrixx-Kernel-Flashable-Zip
-          path: ${{ github.workspace }}/Matrixx-Kernel-Garnet.zip
+          path: ${{ github.workspace }}/Matrixx-Kernel-Garnet-AnyKernel3.zip
+
+      - name: Upload Raw Image Binary Only
+        uses: actions/upload-artifact@v4
+        with:
+          name: garnet-raw-Image
+          path: ${{ github.workspace }}/android/common/arch/arm64/boot/Image
