@@ -95,14 +95,21 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/android/common
           
-          # Export updated environment targeting your exact toolchains extraction folder
+          # Add these variables to your export block or pass them directly to make:
           export ARCH=arm64
           export SUBARCH=arm64
           export PATH="$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
-          export CROSS_COMPILE=aarch64-linux-gnu-
-          export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
-          export CC=clang
           
+          # The critical fix: force the build system to use LLVM tools
+          export CC=clang
+          export LD=ld.lld
+          export AR=llvm-ar
+          export NM=llvm-nm
+          export OBJCOPY=llvm-objcopy
+          export OBJDUMP=llvm-objdump
+          export STRIP=llvm-strip
+          
+          # Then run your make command
           make -j$(nproc)
 
       - name: Upload Kernel Artifact
