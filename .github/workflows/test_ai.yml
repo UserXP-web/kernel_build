@@ -201,7 +201,7 @@ jobs:
           prerelease: false
           files: ${{ github.workspace }}/Matrixx-Kernel-Garnet-AnyKernel3.zip
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Raw Image Binary Only
         uses: actions/upload-artifact@v4
