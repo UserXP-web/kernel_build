@@ -104,7 +104,7 @@ jobs:
                STRIP=llvm-strip \
                olddefconfig
 
-      - name: Compile Monolithic Kernel
+      - name: Compile Monolithic Kernel and Modules
         run: |
           cd $GITHUB_WORKSPACE/android/common
           
@@ -112,24 +112,7 @@ jobs:
           export SUBARCH=arm64
           export PATH="$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
           
-          # 1. Compile the primary Image binary
-          make -j$(nproc) \
-               ARCH=arm64 \
-               SUBARCH=arm64 \
-               CC=clang \
-               HOSTCC=clang \
-               CLANG_TRIPLE=aarch64-linux-gnu- \
-               CROSS_COMPILE=aarch64-linux-gnu- \
-               CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-               CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
-               LD=ld.lld \
-               AR=llvm-ar \
-               NM=llvm-nm \
-               OBJCOPY=llvm-objcopy \
-               OBJDUMP=llvm-objdump \
-               STRIP=llvm-strip
-               
-          # 2. Compile the out-of-tree hardware drivers
+          # 1. Compile the primary Image binary with KCFLAGS fix
           make -j$(nproc) \
                ARCH=arm64 \
                SUBARCH=arm64 \
@@ -145,6 +128,25 @@ jobs:
                OBJCOPY=llvm-objcopy \
                OBJDUMP=llvm-objdump \
                STRIP=llvm-strip \
+               KCFLAGS="-Idrivers/soc/qcom/dcvs"
+               
+          # 2. Compile the companion out-of-tree modules with KCFLAGS fix
+          make -j$(nproc) \
+               ARCH=arm64 \
+               SUBARCH=arm64 \
+               CC=clang \
+               HOSTCC=clang \
+               CLANG_TRIPLE=aarch64-linux-gnu- \
+               CROSS_COMPILE=aarch64-linux-gnu- \
+               CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+               CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+               LD=ld.lld \
+               AR=llvm-ar \
+               NM=llvm-nm \
+               OBJCOPY=llvm-objcopy \
+               OBJDUMP=llvm-objdump \
+               STRIP=llvm-strip \
+               KCFLAGS="-Idrivers/soc/qcom/dcvs" \
                modules
 
       - name: Upload Kernel Artifact
