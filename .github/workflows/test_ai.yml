@@ -76,18 +76,23 @@ jobs:
           make mrproper
           
           # 1. Merge configurations cleanly
-          ARCH=arm64 ./scripts/kconfig/merge_config.sh -m -r \
-              arch/arm64/configs/gki_defconfig \
-              arch/arm64/configs/vendor/garnet_GKI.config
-          
-          # 2. DO NOT change GKI variables to 'n'. Keep them default.
-          # Apply only your proven version string identifier:
-          sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-gki-g6f1c6ad1b54f"/g' .config
-          
-          # Disable ONLY the broken MTD debugging block that crashed the build earlier
+          #ARCH=arm64 ./scripts/kconfig/merge_config.sh -m -r \
+          #    arch/arm64/configs/gki_defconfig \
+          #    arch/arm64/configs/vendor/garnet_GKI.config
+          # 1. Fetch your unified Matrixx 11.9 configuration directly as the base .config
+          curl -sL "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/matrixx_11.9.config" -o .config
+
+          # 2. Modify critical system keys inside the configuration
+          sed -i 's/CONFIG_ANDROID_GKI_BOOT_IMAGE=y/CONFIG_ANDROID_GKI_BOOT_IMAGE=n/g' .config
+          sed -i 's/CONFIG_MODULE_SIG=y/CONFIG_MODULE_SIG=n/g' .config
+          sed -i 's/CONFIG_MODULE_SIG_ALL=y/CONFIG_MODULE_SIG_ALL=n/g' .config
           sed -i 's/CONFIG_MTD_OOPS=y/CONFIG_MTD_OOPS=n/g' .config
           sed -i 's/CONFIG_MTD_OOPS=m/CONFIG_MTD_OOPS=n/g' .config
           
+          # 3. Lock your specific system string suffix to match the ROM framework
+          sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-gki-g6f1c6ad1b54f"/g' .config
+          
+          # 4. Generate the final configuration using your custom Clang paths
           export PATH="$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
           make ARCH=arm64 \
                CC=clang \
@@ -107,7 +112,7 @@ jobs:
           export SUBARCH=arm64
           export PATH="$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
           
-          # Force make to pass variables directly into child makefile processes
+          # 1. Compile the primary Image binary
           make -j$(nproc) \
                ARCH=arm64 \
                SUBARCH=arm64 \
@@ -123,6 +128,24 @@ jobs:
                OBJCOPY=llvm-objcopy \
                OBJDUMP=llvm-objdump \
                STRIP=llvm-strip
+               
+          # 2. Compile the out-of-tree hardware drivers
+          make -j$(nproc) \
+               ARCH=arm64 \
+               SUBARCH=arm64 \
+               CC=clang \
+               HOSTCC=clang \
+               CLANG_TRIPLE=aarch64-linux-gnu- \
+               CROSS_COMPILE=aarch64-linux-gnu- \
+               CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+               CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+               LD=ld.lld \
+               AR=llvm-ar \
+               NM=llvm-nm \
+               OBJCOPY=llvm-objcopy \
+               OBJDUMP=llvm-objdump \
+               STRIP=llvm-strip \
+               modules
 
       - name: Upload Kernel Artifact
         if: false
@@ -136,24 +159,24 @@ jobs:
       - name: Package AnyKernel3 Flashable Zip
         run: |
           cd $GITHUB_WORKSPACE
-          
-          # FIX: Explicit clone tracking targeting the master repository structure
-          git clone https://github.com/osm0sis/AnyKernel3.git --depth=1 AnyKernel3
-          
+          git clone https://github.com --depth=1 AnyKernel3
           rm -rf AnyKernel3/.git AnyKernel3/README.md
           
-          # Move your compiled binary image payload straight into the installer root
+          # Copy your newly compiled image payload
           cp $GITHUB_WORKSPACE/android/common/arch/arm64/boot/Image $GITHUB_WORKSPACE/AnyKernel3/Image
+          
+          # Build a clean directory for vendor module injection
+          mkdir -p $GITHUB_WORKSPACE/AnyKernel3/modules/vendor/lib/modules
+          find $GITHUB_WORKSPACE/android/common/ -name "*.ko" -exec cp {} $GITHUB_WORKSPACE/AnyKernel3/modules/vendor/lib/modules/ \;
           
           cd $GITHUB_WORKSPACE/AnyKernel3
           
-          # Modify explicit template parameters for Xiaomi Garnet sm7435 hardware profiles
-          sed -i 's/device.name1=.*/device.name1=garnet/g' anykernel.sh
+          # Configure parameters inside anykernel.sh using UPPERCASE variables
           sed -i 's/BLOCK=.*/BLOCK=\/dev\/block\/by-name\/boot;/g' anykernel.sh
           sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=1;/g' anykernel.sh
-          sed -i 's/RAMDISK_COMPRESSION=.*/RAMDISK_COMPRESSION=none;/g' anykernel.sh
+          sed -i 's/RAMDISK_COMPRESSION=.*/RAMDISK_COMPRESSION=auto;/g' anykernel.sh
           
-          # Update operational functions to process clean flash writes without ramdisk unpacking
+          # Ensure standard structural unpack/repack steps take place
           sed -i 's/dump_boot;/split_boot;/g' anykernel.sh
           sed -i 's/write_boot;/flash_boot;/g' anykernel.sh
           
@@ -164,7 +187,7 @@ jobs:
         with:
           name: Matrixx-Kernel-Garnet-AnyKernel3
           path: ${{ github.workspace }}/Matrixx-Kernel-Garnet-AnyKernel3.zip
-          compression-level: 0 # Prevents double-zipping your already compressed installer file
+          compression-level: 0
 
       - name: Upload Raw Image Binary Only
         uses: actions/upload-artifact@v4
