@@ -82,17 +82,17 @@ jobs:
           # 1. Fetch your unified Matrixx 11.9 configuration directly as the base .config
           curl -sL "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/matrixx_11.9.config" -o .config
 
-          # 2. Modify critical system keys inside the configuration
           sed -i 's/CONFIG_ANDROID_GKI_BOOT_IMAGE=y/CONFIG_ANDROID_GKI_BOOT_IMAGE=n/g' .config
           sed -i 's/CONFIG_MODULE_SIG=y/CONFIG_MODULE_SIG=n/g' .config
           sed -i 's/CONFIG_MODULE_SIG_ALL=y/CONFIG_MODULE_SIG_ALL=n/g' .config
           sed -i 's/CONFIG_MTD_OOPS=y/CONFIG_MTD_OOPS=n/g' .config
           sed -i 's/CONFIG_MTD_OOPS=m/CONFIG_MTD_OOPS=n/g' .config
-          
-          # 3. Lock your specific system string suffix to match the ROM framework
           sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-gki-g6f1c6ad1b54f"/g' .config
           
-          # 4. Generate the final configuration using your custom Clang paths
+          # CRITICAL FIX: Locally rewrite the macro paths so Clang doesn't require global include injections
+          sed -i 's/#define TRACE_INCLUDE_PATH .*/#define TRACE_INCLUDE_PATH ./' drivers/soc/qcom/dcvs/trace-dcvs.h
+          sed -i 's/#define TRACE_INCLUDE_PATH .*/#define TRACE_INCLUDE_PATH ./' drivers/clk/qcom/trace.h
+          
           export PATH="$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
           make ARCH=arm64 \
                CC=clang \
@@ -112,7 +112,7 @@ jobs:
           export SUBARCH=arm64
           export PATH="$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
           
-          # 1. Compile the primary Image binary with both folder flags added
+          # 1. Compile the primary Image binary (Notice KCFLAGS is removed to protect global headers)
           make -j$(nproc) \
                ARCH=arm64 \
                SUBARCH=arm64 \
@@ -127,10 +127,9 @@ jobs:
                NM=llvm-nm \
                OBJCOPY=llvm-objcopy \
                OBJDUMP=llvm-objdump \
-               STRIP=llvm-strip \
-               KCFLAGS="-Idrivers/soc/qcom/dcvs -Idrivers/clk/qcom"
+               STRIP=llvm-strip
                
-          # 2. Compile the companion modules with both folder flags added
+          # 2. Compile the companion out-of-tree hardware drivers
           make -j$(nproc) \
                ARCH=arm64 \
                SUBARCH=arm64 \
@@ -146,7 +145,6 @@ jobs:
                OBJCOPY=llvm-objcopy \
                OBJDUMP=llvm-objdump \
                STRIP=llvm-strip \
-               KCFLAGS="-Idrivers/soc/qcom/dcvs -Idrivers/clk/qcom" \
                modules
                
           # 2. Compile the companion out-of-tree modules with KCFLAGS fix
