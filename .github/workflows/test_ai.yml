@@ -112,7 +112,7 @@ jobs:
           export SUBARCH=arm64
           export PATH="$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
           
-          # 1. Compile the primary Image binary with KCFLAGS fix
+          # 1. Compile the primary Image binary with both folder flags added
           make -j$(nproc) \
                ARCH=arm64 \
                SUBARCH=arm64 \
@@ -128,7 +128,26 @@ jobs:
                OBJCOPY=llvm-objcopy \
                OBJDUMP=llvm-objdump \
                STRIP=llvm-strip \
-               KCFLAGS="-Idrivers/soc/qcom/dcvs"
+               KCFLAGS="-Idrivers/soc/qcom/dcvs -Idrivers/clk/qcom"
+               
+          # 2. Compile the companion modules with both folder flags added
+          make -j$(nproc) \
+               ARCH=arm64 \
+               SUBARCH=arm64 \
+               CC=clang \
+               HOSTCC=clang \
+               CLANG_TRIPLE=aarch64-linux-gnu- \
+               CROSS_COMPILE=aarch64-linux-gnu- \
+               CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+               CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+               LD=ld.lld \
+               AR=llvm-ar \
+               NM=llvm-nm \
+               OBJCOPY=llvm-objcopy \
+               OBJDUMP=llvm-objdump \
+               STRIP=llvm-strip \
+               KCFLAGS="-Idrivers/soc/qcom/dcvs -Idrivers/clk/qcom" \
+               modules
                
           # 2. Compile the companion out-of-tree modules with KCFLAGS fix
           make -j$(nproc) \
