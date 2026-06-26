@@ -162,8 +162,9 @@ jobs:
       - name: Upload Flashable Zip Installer
         uses: actions/upload-artifact@v4
         with:
-          name: Matrixx-Kernel-Flashable-Zip
+          name: Matrixx-Kernel-Garnet-AnyKernel3
           path: ${{ github.workspace }}/Matrixx-Kernel-Garnet-AnyKernel3.zip
+          compression-level: 0 # Prevents double-zipping your already compressed installer file
 
       - name: Upload Raw Image Binary Only
         uses: actions/upload-artifact@v4
