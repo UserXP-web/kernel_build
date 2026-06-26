@@ -121,7 +121,12 @@ jobs:
           export ARCH=arm64
           export SUBARCH=arm64
           export PATH="$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
-          
+
+          # Force the compilation clock to spoof the exact working 2025 signature
+          export KBUILD_BUILD_TIMESTAMP="Sat Oct 25 02:37:19 UTC 2025"
+          export KBUILD_BUILD_USER="android-build"
+          export KBUILD_BUILD_HOST="ubuntu-runner"
+
           # 1. Compile primary kernel Image binary
           make -j$(nproc) \
                ARCH=arm64 \
