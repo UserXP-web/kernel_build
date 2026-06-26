@@ -166,21 +166,21 @@ jobs:
           # Copy your newly compiled image payload
           cp $GITHUB_WORKSPACE/android/common/arch/arm64/boot/Image $GITHUB_WORKSPACE/AnyKernel3/Image
           
-          # Build a clean directory for vendor module injection
+          # Build the clean directory for vendor module injection
           mkdir -p $GITHUB_WORKSPACE/AnyKernel3/modules/vendor/lib/modules
           find $GITHUB_WORKSPACE/android/common/ -name "*.ko" -exec cp {} $GITHUB_WORKSPACE/AnyKernel3/modules/vendor/lib/modules/ \;
           
           cd $GITHUB_WORKSPACE/AnyKernel3
           
-          # Configure parameters inside anykernel.sh using UPPERCASE variables
+          # 1. Use the exact uppercase attributes required by the osm0sis template
           sed -i 's/device.name1=.*/device.name1=garnet/g' anykernel.sh
           sed -i 's/BLOCK=.*/BLOCK=\/dev\/block\/by-name\/boot;/g' anykernel.sh
           sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=1;/g' anykernel.sh
           sed -i 's/RAMDISK_COMPRESSION=.*/RAMDISK_COMPRESSION=auto;/g' anykernel.sh
           
-          # Ensure standard structural unpack/repack steps take place
-          sed -i 's/dump_boot;/split_boot;/g' anykernel.sh
-          sed -i 's/write_boot;/flash_boot;/g' anykernel.sh
+          # 2. CRITICAL: Revert back to the non-destructive unpack/repack native methods
+          sed -i 's/split_boot;/dump_boot;/g' anykernel.sh
+          sed -i 's/flash_boot;/write_boot;/g' anykernel.sh
           
           #zip -r9 $GITHUB_WORKSPACE/Matrixx-Kernel-Garnet-AnyKernel3.zip *
 
