@@ -95,6 +95,14 @@ jobs:
               sed -i "s|#define TRACE_INCLUDE_PATH .*|#define TRACE_INCLUDE_PATH ../../$dir|" "$file"
           done
 
+          # Disable absolute cryptographic hash version tracking for driver modules
+          sed -i 's/CONFIG_MODVERSIONS=y/CONFIG_MODVERSIONS=n/g' .config
+          # Force the kernel to bypass driver security verification blocks
+          sed -i 's/CONFIG_MODULE_SIG_FORCE=y/CONFIG_MODULE_SIG_FORCE=n/g' .config
+          # Prevent security blocks from killing the initialization sequence
+          sed -i 's/CONFIG_SECURITY_SELINUX_DEVELOP=n/CONFIG_SECURITY_SELINUX_DEVELOP=y/g' .config
+          sed -i 's/CONFIG_LOCK_DOWN_KERNEL_FORCE_NONE=n/CONFIG_LOCK_DOWN_KERNEL_FORCE_NONE=y/g' .config
+
           export PATH="$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
           make ARCH=arm64 \
                CC=clang \
@@ -149,15 +157,6 @@ jobs:
                STRIP=llvm-strip \
                modules
 
-      - name: Upload Kernel Artifact
-        if: false
-        uses: actions/upload-artifact@v4
-        with:
-          name: garnet-non-gki-kernel
-          path: |
-            ${{ github.workspace }}/android/common/arch/arm64/boot/Image
-            ${{ github.workspace }}/android/common/arch/arm64/boot/Image.*
-
       - name: Package AnyKernel3 Flashable Zip
         run: |
           cd $GITHUB_WORKSPACE
@@ -183,25 +182,15 @@ jobs:
           sed -i 's/dump_boot;/split_boot;/g' anykernel.sh
           sed -i 's/write_boot;/flash_boot;/g' anykernel.sh
           
-          zip -r9 $GITHUB_WORKSPACE/Matrixx-Kernel-Garnet-AnyKernel3.zip *
+          #zip -r9 $GITHUB_WORKSPACE/Matrixx-Kernel-Garnet-AnyKernel3.zip *
 
-      - name: Upload Flashable Zip Installer
-        if: false
-        uses: actions/upload-artifact@v4
+      - name: Upload Flashable AnyKernel3 Zip Installer
+        uses: actions/upload-artifact@v7
         with:
           name: Matrixx-Kernel-Garnet-AnyKernel3
-          path: ${{ github.workspace }}/Matrixx-Kernel-Garnet-AnyKernel3.zip
-          compression-level: 0
-      - name: Create Release and Upload Installer
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: kernel-build-${{ github.run_number }}
-          name: Matrixx Kernel Build v${{ github.run_number }}
-          draft: false
-          prerelease: false
-          files: ${{ github.workspace }}/Matrixx-Kernel-Garnet-AnyKernel3.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ github.workspace }}/AnyKernel3/**
+          if-no-files-found: ignore
+          compression-level: 9
 
       - name: Upload Raw Image Binary Only
         uses: actions/upload-artifact@v4
