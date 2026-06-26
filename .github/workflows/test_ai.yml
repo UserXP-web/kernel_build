@@ -89,9 +89,11 @@ jobs:
           sed -i 's/CONFIG_MTD_OOPS=m/CONFIG_MTD_OOPS=n/g' .config
           sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-gki-g6f1c6ad1b54f"/g' .config
           
-          # Force the exact root-relative path replacement for Clang macro resolution
-          sed -i 's|#define TRACE_INCLUDE_PATH .*|#define TRACE_INCLUDE_PATH ../../drivers/soc/qcom/dcvs|' drivers/soc/qcom/dcvs/trace-dcvs.h
-          sed -i 's|#define TRACE_INCLUDE_PATH .*|#define TRACE_INCLUDE_PATH ../../drivers/clk/qcom|' drivers/clk/qcom/trace.h
+          # Automatically fix ALL Qualcomm trace include macros for Clang end-to-end
+          find drivers/soc/qcom/ drivers/clk/qcom/ -name "*trace*.h" -type f | while read -r file; do
+              dir=$(dirname "$file")
+              sed -i "s|#define TRACE_INCLUDE_PATH .*|#define TRACE_INCLUDE_PATH ../../$dir|" "$file"
+          done
 
           export PATH="$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
           make ARCH=arm64 \
