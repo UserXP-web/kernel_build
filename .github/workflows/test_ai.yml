@@ -78,9 +78,9 @@ jobs:
           make mrproper
           
           # 1. Merge configurations cleanly
-          #ARCH=arm64 ./scripts/kconfig/merge_config.sh -m -r \
-          #    arch/arm64/configs/gki_defconfig \
-          #    arch/arm64/configs/vendor/garnet_GKI.config
+          ARCH=arm64 ./scripts/kconfig/merge_config.sh -m -r \
+              arch/arm64/configs/gki_defconfig \
+              arch/arm64/configs/vendor/garnet_GKI.config
 
           sed -i 's/CONFIG_ANDROID_GKI_BOOT_IMAGE=y/CONFIG_ANDROID_GKI_BOOT_IMAGE=n/g' .config
           sed -i 's/CONFIG_MODULE_SIG=y/CONFIG_MODULE_SIG=n/g' .config
