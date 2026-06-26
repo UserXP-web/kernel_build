@@ -88,7 +88,12 @@ jobs:
           sed -i 's/CONFIG_MTD_OOPS=y/CONFIG_MTD_OOPS=n/g' .config
           sed -i 's/CONFIG_MTD_OOPS=m/CONFIG_MTD_OOPS=n/g' .config
           sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-gki-g6f1c6ad1b54f"/g' .config
-          
+
+          # SOLUTION 1: Completely disable loadable module infrastructure safely
+          sed -i 's/CONFIG_MODULES=y/CONFIG_MODULES=n/g' .config
+          # Force only active module definitions to become built-ins (=y)
+          sed -i 's/=m$/=y/g' .config
+
           # FIX: Automatically catch and repair ALL trace paths across the entire drivers tree
           find drivers/ -name "*trace*.h" -type f | while read -r file; do
               dir=$(dirname "$file")
@@ -144,24 +149,6 @@ jobs:
                OBJDUMP=llvm-objdump \
                STRIP=llvm-strip
                
-          # 2. Compile companion hardware modules
-          make -j$(nproc) \
-               ARCH=arm64 \
-               SUBARCH=arm64 \
-               CC=clang \
-               HOSTCC=clang \
-               CLANG_TRIPLE=aarch64-linux-gnu- \
-               CROSS_COMPILE=aarch64-linux-gnu- \
-               CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-               CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
-               LD=ld.lld \
-               AR=llvm-ar \
-               NM=llvm-nm \
-               OBJCOPY=llvm-objcopy \
-               OBJDUMP=llvm-objdump \
-               STRIP=llvm-strip \
-               modules
-
       - name: Package AnyKernel3 Flashable Zip
         run: |
           cd $GITHUB_WORKSPACE
@@ -172,8 +159,8 @@ jobs:
           cp $GITHUB_WORKSPACE/android/common/arch/arm64/boot/Image $GITHUB_WORKSPACE/AnyKernel3/Image
           
           # Build the clean directory for vendor module injection
-          mkdir -p $GITHUB_WORKSPACE/AnyKernel3/modules/vendor/lib/modules
-          find $GITHUB_WORKSPACE/android/common/ -name "*.ko" -exec cp {} $GITHUB_WORKSPACE/AnyKernel3/modules/vendor/lib/modules/ \;
+          #mkdir -p $GITHUB_WORKSPACE/AnyKernel3/modules/vendor/lib/modules
+          #find $GITHUB_WORKSPACE/android/common/ -name "*.ko" -exec cp {} $GITHUB_WORKSPACE/AnyKernel3/modules/vendor/lib/modules/ \;
           
           cd $GITHUB_WORKSPACE/AnyKernel3
           
