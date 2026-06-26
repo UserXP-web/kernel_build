@@ -89,10 +89,10 @@ jobs:
           sed -i 's/CONFIG_MTD_OOPS=m/CONFIG_MTD_OOPS=n/g' .config
           sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-gki-g6f1c6ad1b54f"/g' .config
           
-          # CRITICAL FIX: Locally rewrite the macro paths so Clang doesn't require global include injections
-          sed -i 's/#define TRACE_INCLUDE_PATH .*/#define TRACE_INCLUDE_PATH ./' drivers/soc/qcom/dcvs/trace-dcvs.h
-          sed -i 's/#define TRACE_INCLUDE_PATH .*/#define TRACE_INCLUDE_PATH ./' drivers/clk/qcom/trace.h
-          
+          # Force the exact root-relative path replacement for Clang macro resolution
+          sed -i 's|#define TRACE_INCLUDE_PATH .*|#define TRACE_INCLUDE_PATH ../../drivers/soc/qcom/dcvs|' drivers/soc/qcom/dcvs/trace-dcvs.h
+          sed -i 's|#define TRACE_INCLUDE_PATH .*|#define TRACE_INCLUDE_PATH ../../drivers/clk/qcom|' drivers/clk/qcom/trace.h
+
           export PATH="$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
           make ARCH=arm64 \
                CC=clang \
