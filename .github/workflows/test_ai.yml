@@ -76,45 +76,43 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/android/common
           make mrproper
-
-          # Force disable the debug driver inside the base blueprints before merging
-          echo "CONFIG_ANDROID_DEBUG_KINFO=n" >> arch/arm64/configs/gki_defconfig
-          echo "CONFIG_ANDROID_GKI_DEBUG_KINFO=n" >> arch/arm64/configs/gki_defconfig
-          echo "CONFIG_ANDROID_DEBUG_KINFO=n" >> arch/arm64/configs/vendor/garnet_GKI.config
-          echo "CONFIG_ANDROID_GKI_DEBUG_KINFO=n" >> arch/arm64/configs/vendor/garnet_GKI.config
-
+          
           # 1. Merge configurations cleanly
           ARCH=arm64 ./scripts/kconfig/merge_config.sh -m -r \
               arch/arm64/configs/gki_defconfig \
               arch/arm64/configs/vendor/garnet_GKI.config
 
+          # 2. General config rules
           sed -i 's/CONFIG_ANDROID_GKI_BOOT_IMAGE=y/CONFIG_ANDROID_GKI_BOOT_IMAGE=n/g' .config
-          sed -i 's/CONFIG_MODULE_SIG=y/CONFIG_MODULE_SIG=n/g' .config
-          sed -i 's/CONFIG_MODULE_SIG_ALL=y/CONFIG_MODULE_SIG_ALL=n/g' .config
           sed -i 's/CONFIG_MTD_OOPS=y/CONFIG_MTD_OOPS=n/g' .config
           sed -i 's/CONFIG_MTD_OOPS=m/CONFIG_MTD_OOPS=n/g' .config
           sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-gki-g6f1c6ad1b54f"/g' .config
 
-          # SOLUTION 1: Completely disable loadable module infrastructure safely
-          sed -i 's/CONFIG_MODULES=y/CONFIG_MODULES=n/g' .config
+          # 3. ULTIMATE FUSION BYPASS FLAGS
+          # Keep modules enabled so init scripts don't panic
+          sed -i 's/CONFIG_MODULES=n/CONFIG_MODULES=y/g' .config
+          # Force all compiled drivers to build as built-ins directly inside the core Image
           sed -i 's/=m$/=y/g' .config
-          
-          # Extra safety pass on the output config
-          sed -i 's/CONFIG_ANDROID_DEBUG_KINFO=y/CONFIG_ANDROID_DEBUG_KINFO=n/g' .config
-          sed -i 's/CONFIG_ANDROID_GKI_DEBUG_KINFO=y/CONFIG_ANDROID_GKI_DEBUG_KINFO=n/g' .config
-    
-          # FIX: Automatically catch and repair ALL trace paths across the entire drivers tree
+
+          # Kill EVERY module signature, version, hash, and verification check completely
+          sed -i 's/CONFIG_MODULE_SIG=y/CONFIG_MODULE_SIG=n/g' .config
+          sed -i 's/CONFIG_MODULE_SIG_ALL=y/CONFIG_MODULE_SIG_ALL=n/g' .config
+          sed -i 's/CONFIG_MODULE_SIG_FORCE=y/CONFIG_MODULE_SIG_FORCE=n/g' .config
+          sed -i 's/CONFIG_MODVERSIONS=y/CONFIG_MODVERSIONS=n/g' .config
+
+          # 4. Security Framework permissive flags
+          sed -i 's/CONFIG_SECURITY_SELINUX_DEVELOP=n/CONFIG_SECURITY_SELINUX_DEVELOP=y/g' .config
+          sed -i 's/CONFIG_LOCK_DOWN_KERNEL_FORCE_NONE=n/CONFIG_LOCK_DOWN_KERNEL_FORCE_NONE=y/g' .config
+
+          # 5. Global fixes for trace headers and the staging debug driver
+          echo "obj-n += debug_kinfo.o" > drivers/staging/android/Makefile
           find drivers/ -name "*trace*.h" -type f | while read -r file; do
               dir=$(dirname "$file")
               sed -i "s|#define TRACE_INCLUDE_PATH .*|#define TRACE_INCLUDE_PATH ../../$dir|" "$file"
           done
 
           # Force the compiler to completely bypass the crashing debug_kinfo source file
-          echo "obj-n += debug_kinfo.o" > drivers/staging/android/Makefile
-
-          # Prevent security blocks from killing the initialization sequence
-          sed -i 's/CONFIG_SECURITY_SELINUX_DEVELOP=n/CONFIG_SECURITY_SELINUX_DEVELOP=y/g' .config
-          sed -i 's/CONFIG_LOCK_DOWN_KERNEL_FORCE_NONE=n/CONFIG_LOCK_DOWN_KERNEL_FORCE_NONE=y/g' .config
+          #echo "obj-n += debug_kinfo.o" > drivers/staging/android/Makefile
 
           export PATH="$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
           make ARCH=arm64 \
