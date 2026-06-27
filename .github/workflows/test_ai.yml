@@ -109,6 +109,9 @@ jobs:
               sed -i "s|#define TRACE_INCLUDE_PATH .*|#define TRACE_INCLUDE_PATH ../../$dir|" "$file"
           done
 
+          # Force the compiler to completely bypass the crashing debug_kinfo source file
+          echo "obj-n += debug_kinfo.o" > drivers/staging/android/Makefile
+
           # Prevent security blocks from killing the initialization sequence
           sed -i 's/CONFIG_SECURITY_SELINUX_DEVELOP=n/CONFIG_SECURITY_SELINUX_DEVELOP=y/g' .config
           sed -i 's/CONFIG_LOCK_DOWN_KERNEL_FORCE_NONE=n/CONFIG_LOCK_DOWN_KERNEL_FORCE_NONE=y/g' .config
