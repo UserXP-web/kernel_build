@@ -133,16 +133,16 @@ jobs:
           sed -i 's/supported.patchlevels=.*/supported.patchlevels=/g' anykernel.sh
           sed -i 's/supported.vendorpatchlevels=.*/supported.vendorpatchlevels=/g' anykernel.sh
           
-          # Αυστηρή διόρθωση για καθαρό όνομα συσκευής
-          sed -i 's/^device.name1=.*/device.name1=garnet/g' anykernel.sh
+          # Καθαρισμός και αυστηρός ορισμός της συσκευής βάσει των custom κεφαλαίων μεταβλητών του template σου
+          sed -i 's/^IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=1/g' anykernel.sh
+          sed -i 's/^RAMDISK_COMPRESSION=.*/RAMDISK_COMPRESSION=gzip/g' anykernel.sh
           
           sed -i 's/do.devicecheck=0/do.devicecheck=1/g' anykernel.sh
           sed -i 's/do.modules=1/do.modules=0/g' anykernel.sh
           sed -i 's/do.systemless=0/do.systemless=1/g' anykernel.sh
-          sed -i 's/is_slot_device=0/is_slot_device=1/g' anykernel.sh
           
-          # Εισαγωγή των V4 Headers και Gzip ρυθμίσεων απευθείας στο script
-          sed -i 's/block=\/dev\/block\/by-name\/boot;/block=\/dev\/block\/by-name\/boot;\n\navb_header_version=4;\nramdisk_compression=gzip;/g' anykernel.sh
+          # Εισαγωγή της κρίσιμης V4 υπογραφής ακριβώς κάτω από το BLOCK path του template σου
+          sed -i 's/BLOCK=\/dev\/block\/bootdevice\/by-name\/boot\$slot;/BLOCK=\/dev\/block\/bootdevice\/by-name\/boot\$slot;\n\navb_header_version=4;/g' anykernel.sh
 
       - name: Combine Compiled Image into AnyKernel3 Workspace
         run: |
@@ -150,15 +150,23 @@ jobs:
           if [ -f "android/common/out/arch/arm64/boot/Image.gz" ]; then
             cp android/common/out/arch/arm64/boot/Image.gz AnyKernel3/Image
           else
-            echo "❌ ERROR: Native Image.gz binary was missing from output path!"
-            exit 1
+            echo "❌ Native Image.gz binary was missing from output path!"
+            # 1. Έλεγχος αν υπάρχει το αρχικό ασυμπίεστο Image
+            if [ -f "android/common/out/arch/arm64/boot/Image" ]; then
+              # 2. Αντιγραφή του Image στον αρχικό κατάλογο εργασίας
+              cp android/common/out/arch/arm64/boot/Image $GITHUB_WORKSPACE/Image_raw
+              
+              # 3. Native Linux συμπίεση σε Gzip με μέγιστο επίπεδο (9) χωρίς metadata χρόνου (-n)
+              gzip -9 -n $GITHUB_WORKSPACE/Image_raw
+              
+              # 4. Μεταφορά του έτοιμου Image.gz ως σκέτο 'Image' μέσα στο AnyKernel3
+              mv $GITHUB_WORKSPACE/Image_raw.gz AnyKernel3/Image
+              echo "✅ Native Linux Gzip compression complete!"
+            else
+              echo "❌ ERROR: Generated raw Image binary was missing from output path!"
+              exit 1
+            fi
           fi
-          #if [ -f "android/common/out/arch/arm64/boot/Image" ]; then
-          #  cp android/common/out/arch/arm64/boot/Image AnyKernel3/Image
-          #else
-          #  echo "❌ ERROR: Generated Image binary was missing from output path!"
-          #  exit 1
-          #fi
           
       - name: Upload Finished Kernel Zip Artifact
         uses: actions/upload-artifact@v7
