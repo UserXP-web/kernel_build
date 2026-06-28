@@ -103,25 +103,16 @@ jobs:
           
           export ARCH=arm64
           export SUBARCH=arm64
-          export CROSS_COMPILE=aarch64-linux-gnu-
-          export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
-          export CC=clang
-          export LD=ld.lld
-          export AR=llvm-ar
-          export NM=llvm-nm
-          export OBJCOPY=llvm-objcopy
-          export OBJDUMP=llvm-objdump
-          export STRIP=llvm-strip
           export CLANG_TRIPLE=aarch64-linux-gnu-
           
-          # Δημιουργία του βασικού GKI configuration με ορισμό του σωστού Linker
-          make O=out LD=ld.lld gki_defconfig
+          # Δημιουργία του βασικού GKI configuration ενεργοποιώντας πλήρως το LLVM toolchain
+          make O=out LLVM=1 LLVM_IAS=1 gki_defconfig
           
           # Συγχώνευση των ειδικών ρυθμίσεων του Garnet πάνω στο GKI config
           scripts/kconfig/merge_config.sh -O out out/.config arch/arm64/configs/vendor/garnet_GKI.config
           
-          # Εκκίνηση της μεταγλώττισης του πυρήνα με LLVM εργαλεία
-          make -j$(nproc --all) O=out CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip Image
+          # Εκκίνηση της μεταγλώττισης του πυρήνα
+          make -j$(nproc --all) O=out LLVM=1 LLVM_IAS=1 Image
 
       - name: Download AnyKernel3 Base
         run: |
