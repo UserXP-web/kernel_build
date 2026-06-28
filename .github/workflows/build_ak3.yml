@@ -63,9 +63,9 @@ jobs:
 
       - name: ⬇️ Download Source Code (Evolution X Kernel Only)
         run: |
-          mkdir -p android
+          mkdir -p android/common
           # Κάνουμε clone απευθείας μόνο τον πυρήνα του garnet για Android 16 (branch bka)
-          git clone --depth=1 -b bka "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet" android
+          git clone --depth=1 -b bka "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet" android/common
       - name: ⬇️ Download Source Code via Repo Tool
         if: false
         run: |
@@ -99,10 +99,8 @@ jobs:
         run: |
           cd android/common
           
-          # Map compilation tools down your configured workspace paths
           export PATH="$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
           
-          # Universal compilation architecture control blocks
           export ARCH=arm64
           export SUBARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
@@ -110,10 +108,13 @@ jobs:
           export CC=clang
           export CLANG_TRIPLE=aarch64-linux-gnu-
           
-          # Initialize your targeted kernel configuration matrix
-          make O=out garnet_defconfig
+          # Δημιουργία του βασικού GKI configuration
+          make O=out gki_defconfig
           
-          # Generate your standalone GKI kernel payload
+          # Συγχώνευση των ειδικών ρυθμίσεων του Garnet πάνω στο GKI config
+          scripts/kconfig/merge_config.sh -O out out/.config arch/arm64/configs/vendor/garnet_GKI.config
+          
+          # Εκκίνηση της μεταγλώττισης του πυρήνα
           make -j$(nproc --all) O=out Image
 
       - name: Download AnyKernel3 Base
@@ -151,11 +152,10 @@ jobs:
 
       - name: Combine Compiled Image into AnyKernel3 Workspace
         run: |
-          # Verify file presence and move the generated kernel payload into place
-          if [ -f "source/out/arch/arm64/boot/Image" ]; then
-            cp source/out/arch/arm64/boot/Image AnyKernel3/Image
+          if [ -f "android/common/out/arch/arm64/boot/Image" ]; then
+            cp android/common/out/arch/arm64/boot/Image AnyKernel3/Image
           else
-            echo "❌ ERROR: Compiled Image binary not found in compilation output tree!"
+            echo "❌ ERROR: Generated Image binary was missing from output path!"
             exit 1
           fi
 
