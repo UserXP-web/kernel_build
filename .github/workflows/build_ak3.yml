@@ -75,7 +75,7 @@ jobs:
           #MANIFEST_XML="manifest/zylhdrXP.xml" # manifest/${{ inputs.MANIFEST_selection }}.xml
           echo "🌐 Initialize Evolution X kernel repository..."
           MANIFEST_URL="https://github.com/Evolution-X/manifest"
-          MANIFEST_BRANCH="sixteen"
+          MANIFEST_BRANCH="bka"
           MANIFEST_XML="default.xml"
           echo "~ $MANIFEST_URL ^^^ $MANIFEST_BRANCH --- $MANIFEST_XML"        
           repo init --depth=1 -u $MANIFEST_URL -b $MANIFEST_BRANCH -m $MANIFEST_XML
