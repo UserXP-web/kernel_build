@@ -105,19 +105,16 @@ jobs:
           export SUBARCH=arm64
           export CLANG_TRIPLE=aarch64-linux-gnu-
           
-          # Καθολική αλλαγή του ορίου stack frame από 2048 σε 4096 στο κεντρικό Makefile
-          sed -i 's/-Wframe-larger-than=2048/-Wframe-larger-than=4096/g' Makefile
-          
-          # Παράκαμψη του ορίου και στο Kconfig.debug για σιγουριά
-          sed -i 's/default 2048 if ARM64/default 4096 if ARM64/g' lib/Kconfig.debug
-          
           # Δημιουργία του βασικού GKI configuration
           make O=out LLVM=1 LLVM_IAS=1 gki_defconfig
           
           # Συγχώνευση των ειδικών ρυθμίσεων του Garnet πάνω στο GKI config
           scripts/kconfig/merge_config.sh -O out out/.config arch/arm64/configs/vendor/garnet_GKI.config
           
-          # Εκκίνηση της μεταγλώττισης του πυρήνα
+          # ΔΙΟΡΘΩΣΗ: Αλλαγή του ορίου stack frame απευθείας στο παραχθέν .config αρχείο
+          sed -i 's/CONFIG_FRAME_WARN=2048/CONFIG_FRAME_WARN=4096/g' out/.config
+          
+          # Εκκίνηση της μεταγλώττισης του πυρήνας
           make -j$(nproc --all) O=out LLVM=1 LLVM_IAS=1 Image
 
       - name: Download AnyKernel3 Base
