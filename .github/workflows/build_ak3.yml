@@ -61,8 +61,13 @@ jobs:
           tar -xzf clang.tar.gz -C clang/ && rm clang.tar.gz
           echo "Done."
 
-          
-      - name: ⬇️ Clone Kernel Source
+      - name: ⬇️ Download Source Code (Evolution X Kernel Only)
+        run: |
+          mkdir -p android
+          # Κάνουμε clone απευθείας μόνο τον πυρήνα του garnet για Android 16 (branch bka)
+          git clone --depth=1 -b bka "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet" android
+      - name: ⬇️ Download Source Code via Repo Tool
+        if: false
         run: |
           mkdir -p android && cd android
 
@@ -84,6 +89,11 @@ jobs:
           repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle --force-sync
   
           echo "✅ Kernel source code cloning complete"
+
+      - name: Check Defconfig Location
+        run: |
+          cd android
+          find . -name "*garnet*defconfig*"
 
       - name: Compile Kernel Image
         run: |
