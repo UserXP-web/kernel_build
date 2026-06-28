@@ -105,7 +105,10 @@ jobs:
           export SUBARCH=arm64
           export CLANG_TRIPLE=aarch64-linux-gnu-
           
-          # Παράκαμψη του stack frame size limit για τον Clang αυξάνοντας το όριο στα 4096
+          # Καθολική αλλαγή του ορίου stack frame από 2048 σε 4096 στο κεντρικό Makefile
+          sed -i 's/-Wframe-larger-than=2048/-Wframe-larger-than=4096/g' Makefile
+          
+          # Παράκαμψη του ορίου και στο Kconfig.debug για σιγουριά
           sed -i 's/default 2048 if ARM64/default 4096 if ARM64/g' lib/Kconfig.debug
           
           # Δημιουργία του βασικού GKI configuration
