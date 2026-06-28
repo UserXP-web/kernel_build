@@ -128,35 +128,38 @@ jobs:
         run: |
           cd AnyKernel3
           
-          # Προσαρμογή Ετικέτας Αναγνώρισης (Kernel String)
           sed -i 's/kernel.string=.*/kernel.string=Garnet-OSS-Custom-GKI/g' anykernel.sh
-          
-          # Αφαίρεση αυστηρών περιορισμών έκδοσης Android και Security Patches
           sed -i 's/supported.versions=.*/supported.versions=/g' anykernel.sh
           sed -i 's/supported.patchlevels=.*/supported.patchlevels=/g' anykernel.sh
           sed -i 's/supported.vendorpatchlevels=.*/supported.vendorpatchlevels=/g' anykernel.sh
           
-          # Έλεγχοι ασφαλείας συσκευής ειδικά για το garnet
-          sed -i 's/do.devicecheck=0/do.devicecheck=1/g' anykernel.sh
-          # ΔΙΟΡΘΩΣΗ: Καθαρίζει όλη τη γραμμή και βάζει αυστηρά σκέτο "device.name1=garnet"
+          # Αυστηρή διόρθωση για καθαρό όνομα συσκευής
           sed -i 's/^device.name1=.*/device.name1=garnet/g' anykernel.sh
           
-          # Απενεργοποίηση φόρτωσης εξωτερικών modules για προστασία της AOSP ROM
+          sed -i 's/do.devicecheck=0/do.devicecheck=1/g' anykernel.sh
           sed -i 's/do.modules=1/do.modules=0/g' anykernel.sh
           sed -i 's/do.systemless=0/do.systemless=1/g' anykernel.sh
-          
-          # Ενεργοποίηση ρυθμίσεων για A/B slots κατατμήσεις του garnet
           sed -i 's/is_slot_device=0/is_slot_device=1/g' anykernel.sh
+          
+          # Εισαγωγή των V4 Headers και Gzip ρυθμίσεων απευθείας στο script
+          sed -i 's/block=\/dev\/block\/by-name\/boot;/block=\/dev\/block\/by-name\/boot;\n\navb_header_version=4;\nramdisk_compression=gzip;/g' anykernel.sh
 
       - name: Combine Compiled Image into AnyKernel3 Workspace
         run: |
-          if [ -f "android/common/out/arch/arm64/boot/Image" ]; then
-            cp android/common/out/arch/arm64/boot/Image AnyKernel3/Image
+          # ΔΙΟΡΘΩΣΗ: Παίρνουμε το έτοιμο, native Image.gz και το μετονομάζουμε σε Image για το AnyKernel3
+          if [ -f "android/common/out/arch/arm64/boot/Image.gz" ]; then
+            cp android/common/out/arch/arm64/boot/Image.gz AnyKernel3/Image
           else
-            echo "❌ ERROR: Generated Image binary was missing from output path!"
+            echo "❌ ERROR: Native Image.gz binary was missing from output path!"
             exit 1
           fi
-
+          #if [ -f "android/common/out/arch/arm64/boot/Image" ]; then
+          #  cp android/common/out/arch/arm64/boot/Image AnyKernel3/Image
+          #else
+          #  echo "❌ ERROR: Generated Image binary was missing from output path!"
+          #  exit 1
+          #fi
+          
       - name: Upload Finished Kernel Zip Artifact
         uses: actions/upload-artifact@v7
         with:
