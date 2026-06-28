@@ -16,11 +16,18 @@ jobs:
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
+          # Εγκατάσταση των βασικών εξαρτήσεων με libsdl2-dev αντί για libsdl1.1-dev
           sudo apt-get install -y bc bison build-essential ccache flex g++-multilib \
             gcc-multilib git gnupg gperf lib32readline-dev lib32z1-dev liblz4-tool \
-            libncurses5-dev libsdl1.1-dev libssl-dev libxml2 libxml2-utils lzop \
+            libncurses5-dev libsdl2-dev libssl-dev libxml2 libxml2-utils lzop \
             pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev \
-            python3 libelf-dev clang lld llvm libssl-dev libtinfo5
+            python3 libelf-dev clang lld llvm libssl-dev repo wget
+
+      - name: Install Legacy libtinfo5 Dependency
+        run: |
+          # Χειροκίνητη λήψη και εγκατάσταση του libtinfo5 που λείπει από τα νέα Ubuntu είδωλα
+          wget http://ubuntu.com
+          sudo dpkg -i libtinfo5_6.4-2_amd64.deb || sudo apt-get install -f -y
 
       - name: "🔐 Configure Git"
         run: |
@@ -30,6 +37,7 @@ jobs:
           echo "✅ Git configuration complete."
           
       - name: 📥 Install Repo Tool
+        if: false
         run: |
           if ! command -v repo &> /dev/null; then
               echo "⬇️ Installing 'repo'..."
@@ -52,15 +60,23 @@ jobs:
           echo "Done. Extracting..."
           tar -xzf clang.tar.gz -C clang/ && rm clang.tar.gz
           echo "Done."
+
           
       - name: ⬇️ Clone Kernel Source
         run: |
           mkdir -p android && cd android
-          
-          echo "🌐 Initialize kernel repository..."
-          MANIFEST_URL="https://github.com/UserXP-web/kernel_build" # ${{ env.manifest_url }}
-          MANIFEST_BRANCH="main" # ${{ env.manifest_branch }}
-          MANIFEST_XML="manifest/zylhdrXP.xml" # manifest/${{ inputs.MANIFEST_selection }}.xml
+
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+
+          #echo "🌐 Initialize kernel repository..."
+          #MANIFEST_URL="https://github.com/UserXP-web/kernel_build" # ${{ env.manifest_url }}
+          #MANIFEST_BRANCH="main" # ${{ env.manifest_branch }}
+          #MANIFEST_XML="manifest/zylhdrXP.xml" # manifest/${{ inputs.MANIFEST_selection }}.xml
+          echo "🌐 Initialize Evolution X kernel repository..."
+          MANIFEST_URL="https://github.com/Evolution-X/manifest"
+          MANIFEST_BRANCH="sixteen"
+          MANIFEST_XML="default.xml"
           echo "~ $MANIFEST_URL ^^^ $MANIFEST_BRANCH --- $MANIFEST_XML"        
           repo init --depth=1 -u $MANIFEST_URL -b $MANIFEST_BRANCH -m $MANIFEST_XML
   
