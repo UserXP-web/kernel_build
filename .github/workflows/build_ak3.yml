@@ -138,7 +138,8 @@ jobs:
           
           # Έλεγχοι ασφαλείας συσκευής ειδικά για το garnet
           sed -i 's/do.devicecheck=0/do.devicecheck=1/g' anykernel.sh
-          sed -i 's/device.name1=/device.name1=garnet/g' anykernel.sh
+          # ΔΙΟΡΘΩΣΗ: Καθαρίζει όλη τη γραμμή και βάζει αυστηρά σκέτο "device.name1=garnet"
+          sed -i 's/^device.name1=.*/device.name1=garnet/g' anykernel.sh
           
           # Απενεργοποίηση φόρτωσης εξωτερικών modules για προστασία της AOSP ROM
           sed -i 's/do.modules=1/do.modules=0/g' anykernel.sh
