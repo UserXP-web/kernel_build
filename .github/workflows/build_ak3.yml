@@ -155,14 +155,14 @@ jobs:
             if [ -f "android/common/out/arch/arm64/boot/Image" ]; then
               # 2. Αντιγραφή του Image στον αρχικό κατάλογο εργασίας
               cp android/common/out/arch/arm64/boot/Image $GITHUB_WORKSPACE/Image_raw
-              
+
+              # -. Copy του έτοιμου Image_raw στο AnyKernel3
+              cp $GITHUB_WORKSPACE/Image_raw AnyKernel3/Image_raw
+
               # 3. Native Linux συμπίεση σε Gzip με μέγιστο επίπεδο (9) χωρίς metadata χρόνου (-n)
               gzip -9 -n $GITHUB_WORKSPACE/Image_raw
 
-              # 4. Μεταφορά του έτοιμου Image_raw στο AnyKernel3
-              mv $GITHUB_WORKSPACE/Image_raw AnyKernel3/Image_raw
-              
-              # 4. Μεταφορά του έτοιμου Image.gz ως σκέτο 'Image' μέσα στο AnyKernel3
+              # 4. Μεταφορά του έτοιμου Image_raw.gz ως σκέτο 'Image' μέσα στο AnyKernel3
               mv $GITHUB_WORKSPACE/Image_raw.gz AnyKernel3/Image
               echo "✅ Native Linux Gzip compression complete!"
             else
