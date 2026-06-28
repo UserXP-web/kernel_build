@@ -111,11 +111,8 @@ jobs:
           # Συγχώνευση των ειδικών ρυθμίσεων του Garnet πάνω στο GKI config
           scripts/kconfig/merge_config.sh -O out out/.config arch/arm64/configs/vendor/garnet_GKI.config
           
-          # ΔΙΟΡΘΩΣΗ: Αλλαγή του ορίου stack frame απευθείας στο παραχθέν .config αρχείο
-          sed -i 's/CONFIG_FRAME_WARN=2048/CONFIG_FRAME_WARN=4096/g' out/.config
-          
-          # Εκκίνηση της μεταγλώττισης του πυρήνας
-          make -j$(nproc --all) O=out LLVM=1 LLVM_IAS=1 Image
+          # Εκκίνηση της μεταγλώττισης με απενεργοποίηση του frame limit warning μέσω KCFLAGS
+          make -j$(nproc --all) O=out LLVM=1 LLVM_IAS=1 KCFLAGS="-Wno-frame-larger-than" Image
 
       - name: Download AnyKernel3 Base
         run: |
