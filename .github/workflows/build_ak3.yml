@@ -105,7 +105,10 @@ jobs:
           export SUBARCH=arm64
           export CLANG_TRIPLE=aarch64-linux-gnu-
           
-          # Δημιουργία του βασικού GKI configuration ενεργοποιώντας πλήρως το LLVM toolchain
+          # Παράκαμψη του stack frame size limit για τον Clang αυξάνοντας το όριο στα 4096
+          sed -i 's/default 2048 if ARM64/default 4096 if ARM64/g' lib/Kconfig.debug
+          
+          # Δημιουργία του βασικού GKI configuration
           make O=out LLVM=1 LLVM_IAS=1 gki_defconfig
           
           # Συγχώνευση των ειδικών ρυθμίσεων του Garnet πάνω στο GKI config
