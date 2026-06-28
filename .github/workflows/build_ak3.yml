@@ -150,7 +150,7 @@ jobs:
           if [ -f "android/common/out/arch/arm64/boot/Image.gz" ]; then
             cp android/common/out/arch/arm64/boot/Image.gz AnyKernel3/Image
           else
-            echo "❌ Native Image.gz binary was missing from output path!"
+            echo "Native Image.gz binary was missing from output path!"
             # 1. Έλεγχος αν υπάρχει το αρχικό ασυμπίεστο Image
             if [ -f "android/common/out/arch/arm64/boot/Image" ]; then
               # 2. Αντιγραφή του Image στον αρχικό κατάλογο εργασίας
@@ -158,6 +158,9 @@ jobs:
               
               # 3. Native Linux συμπίεση σε Gzip με μέγιστο επίπεδο (9) χωρίς metadata χρόνου (-n)
               gzip -9 -n $GITHUB_WORKSPACE/Image_raw
+
+              # 4. Μεταφορά του έτοιμου Image_raw στο AnyKernel3
+              mv $GITHUB_WORKSPACE/Image_raw AnyKernel3/Image_raw
               
               # 4. Μεταφορά του έτοιμου Image.gz ως σκέτο 'Image' μέσα στο AnyKernel3
               mv $GITHUB_WORKSPACE/Image_raw.gz AnyKernel3/Image
