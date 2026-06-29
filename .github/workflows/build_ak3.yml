@@ -183,13 +183,12 @@ jobs:
             fi
           fi
 
-          # 2. Χειροκίνητο Πακετάρισμα (Packing) των παραχθέντων DTB αρχείων σε dtbo.img μέσω mkdtboimg.py
-          echo "📦 Packaging DTBO image using Qualcomm mkdtboimg tool..."
-          # Εκτέλεση του σωστού script με το page_size=4096 που ζητάει ο bootloader του garnet
-          python3 android/common/scripts/dtc/libfdt/mkdtboimg.py create AnyKernel3/dtbo.img --page_size=4096 android/common/out/arch/arm64/boot/dts/vendor/qcom/*.dtb
-          # 3. Έλεγχος αν το dtbo.img δημιουργήθηκε με επιτυχία στο AnyKernel3
+          # 2. Χειροκίνητο Πακετάρισμα των .dtb αρχείων σε dtbo.img με τη σωστή διαδρομή libufdt
+          echo "📦 Packaging DTBO image using mkdtboimg.py..."
+          python3 android/common/scripts/dtc/libufdt/mkdtboimg.py create AnyKernel3/dtbo.img --page_size=4096 android/common/out/arch/arm64/boot/dts/vendor/qcom/*.dtb
+          # 3. Έλεγχος αν το dtbo.img δημιουργήθηκε με επιτυχία στο AnyKernel3 Workspace
           if [ -f "AnyKernel3/dtbo.img" ]; then
-            echo "✅ dtbo.img was packaged and copied successfully via mkdtboimg!"
+            echo "✅ dtbo.img was packaged and copied successfully via libufdt/mkdtboimg.py!"
           else
             echo "❌ ERROR: mkdtboimg.py failed to generate dtbo.img!"
             exit 1
