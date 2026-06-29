@@ -183,17 +183,15 @@ jobs:
             fi
           fi
 
-          # 2. Χειροκίνητο Πακετάρισμα (Packing) των παραχθέντων DTB αρχείων σε dtbo.img μέσω mkdtimg
-          echo "📦 Packaging DTBO image using mkdtimg tool..."          
-          # Εντολή που δημιουργεί το dtbo.img παίρνοντας όλα τα compiled blobs του garnet
-          python3 android/common/scripts/dtc/libfdt/mkdtimg.py create AnyKernel3/dtbo.img --page_size=4096 android/common/out/arch/arm64/boot/dts/vendor/qcom/*.dtb || \
-          android/common/scripts/dtc/libfdt/mkdtimg create AnyKernel3/dtbo.img --page_size=4096 android/common/out/arch/arm64/boot/dts/vendor/qcom/*.dtb || \
-          python3 android/common/scripts/mkdtimg.py create AnyKernel3/dtbo.img --page_size=4096 android/common/out/arch/arm64/boot/dts/vendor/qcom/*.dtb
+          # 2. Χειροκίνητο Πακετάρισμα (Packing) των παραχθέντων DTB αρχείων σε dtbo.img μέσω mkdtboimg.py
+          echo "📦 Packaging DTBO image using Qualcomm mkdtboimg tool..."
+          # Εκτέλεση του σωστού script με το page_size=4096 που ζητάει ο bootloader του garnet
+          python3 android/common/scripts/dtc/libfdt/mkdtboimg.py create AnyKernel3/dtbo.img --page_size=4096 android/common/out/arch/arm64/boot/dts/vendor/qcom/*.dtb
           # 3. Έλεγχος αν το dtbo.img δημιουργήθηκε με επιτυχία στο AnyKernel3
           if [ -f "AnyKernel3/dtbo.img" ]; then
-            echo "✅ dtbo.img was packaged and copied successfully!"
+            echo "✅ dtbo.img was packaged and copied successfully via mkdtboimg!"
           else
-            echo "❌ ERROR: mkdtimg failed to generate dtbo.img!"
+            echo "❌ ERROR: mkdtboimg.py failed to generate dtbo.img!"
             exit 1
           fi
 
