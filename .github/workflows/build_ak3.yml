@@ -144,6 +144,9 @@ jobs:
           # Εισαγωγή της κρίσιμης V4 υπογραφής ακριβώς κάτω από το BLOCK path του template σου
           sed -i 's/BLOCK=\/dev\/block\/bootdevice\/by-name\/boot\$slot;/BLOCK=\/dev\/block\/bootdevice\/by-name\/boot\$slot;\n\navb_header_version=4;/g' anykernel.sh
 
+          # ΔΙΟΡΘΩΣΗ: Αναγκάζουμε το AnyKernel3 να φλασάρει το dtbo.img αμέσως μετά το flash_boot
+          sed -i 's/flash_boot;/flash_boot;\n\n# Flash custom DTBO\nif [ -f \$home\/dtbo.img ]; then\n  ui_print " "; ui_print "Flashing custom DTBO...";\n  flash_generic dtbo;\nfi/g' anykernel.sh
+
       - name: dtbo maker
         if: false
         run: |
