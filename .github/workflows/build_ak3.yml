@@ -35,6 +35,10 @@ jobs:
           git config --global user.name "${{ github.actor }}"
           git config --global user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
           echo "✅ Git configuration complete."
+
+          # 2. Κατέβασμα του επίσημου mkdtboimg.py εργαλείου
+          echo "🌐 Downloading official mkdtboimg.py tool..."
+          curl -sL "https://android.googlesource.com/platform/system/libufdt/+/master/utils/src/mkdtboimg.py?format=TEXT" | base64 --decode --ignore-garbage > $GITHUB_WORKSPACE/mkdtboimg.py
           
       - name: 📥 Install Repo Tool
         if: false
@@ -183,9 +187,9 @@ jobs:
             fi
           fi
 
-          # 2. Κατέβασμα του επίσημου mkdtboimg.py εργαλείου από το Google Source
+          # 2. Κατέβασμα του επίσημου mkdtboimg.py εργαλείου
           echo "🌐 Downloading official mkdtboimg.py tool..."
-          curl -sL "https://android.googlesource.com/platform/system/libufdt/+/master/utils/src/mkdtboimg.py?format=TEXT" | base64 --decode > $GITHUB_WORKSPACE/mkdtboimg.py
+          curl -sL "https://android.googlesource.com/platform/system/libufdt/+/master/utils/src/mkdtboimg.py?format=TEXT" | base64 --decode --ignore-garbage > $GITHUB_WORKSPACE/mkdtboimg.py
           # 3. Χειροκίνητο Πακετάρισμα των .dtb αρχείων σε dtbo.img με page_size=4096
           echo "📦 Packaging DTBO image using downloaded mkdtboimg.py..."
           chmod +x $GITHUB_WORKSPACE/mkdtboimg.py
