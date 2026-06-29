@@ -183,12 +183,16 @@ jobs:
             fi
           fi
 
-          # 2. Χειροκίνητο Πακετάρισμα των .dtb αρχείων σε dtbo.img με τη σωστή διαδρομή libufdt
-          echo "📦 Packaging DTBO image using mkdtboimg.py..."
-          python3 android/common/scripts/dtc/libufdt/mkdtboimg.py create AnyKernel3/dtbo.img --page_size=4096 android/common/out/arch/arm64/boot/dts/vendor/qcom/*.dtb
-          # 3. Έλεγχος αν το dtbo.img δημιουργήθηκε με επιτυχία στο AnyKernel3 Workspace
+          # 2. Κατέβασμα του επίσημου mkdtboimg.py εργαλείου από το Google Source
+          echo "🌐 Downloading official mkdtboimg.py tool..."
+          curl -sL "https://android.googlesource.com/platform/system/libufdt/+/master/utils/src/mkdtboimg.py?format=TEXT" | base64 --decode > $GITHUB_WORKSPACE/mkdtboimg.py
+          # 3. Χειροκίνητο Πακετάρισμα των .dtb αρχείων σε dtbo.img με page_size=4096
+          echo "📦 Packaging DTBO image using downloaded mkdtboimg.py..."
+          chmod +x $GITHUB_WORKSPACE/mkdtboimg.py
+          python3 $GITHUB_WORKSPACE/mkdtboimg.py create AnyKernel3/dtbo.img --page_size=4096 android/common/out/arch/arm64/boot/dts/vendor/qcom/*.dtb
+          # 4. Έλεγχος αν το dtbo.img δημιουργήθηκε με επιτυχία στο AnyKernel3 Workspace
           if [ -f "AnyKernel3/dtbo.img" ]; then
-            echo "✅ dtbo.img was packaged and copied successfully via libufdt/mkdtboimg.py!"
+            echo "✅ dtbo.img was packaged and copied successfully!"
           else
             echo "❌ ERROR: mkdtboimg.py failed to generate dtbo.img!"
             exit 1
