@@ -153,7 +153,6 @@ jobs:
 
       - name: Combine Compiled Image into AnyKernel3 Workspace
         run: |
-          out/arch/arm64/boot you will see 
           if [ -f "android/common/out/arch/arm64/boot/dtbo.img" ]; then
             cp android/common/out/arch/arm64/boot/dtbo.img AnyKernel3/dtbo.img
           fi
