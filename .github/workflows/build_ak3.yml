@@ -191,17 +191,17 @@ jobs:
           # 3. Εντοπισμός όλων των παραχθέντων DTB αρχείων και δυναμικό πακετάρισμα
           echo "📦 Finding and packaging DTBO image..."
           DTB_FILES=$(find android/common/out/arch/arm64/boot/dts/ -name "*.dtb")
-          
           if [ -z "$DTB_FILES" ]; then
             echo "❌ ERROR: No compiled .dtb files were found in the output directory!"
             exit 1
           fi
-          
           python3 $GITHUB_WORKSPACE/mkdtboimg.py create AnyKernel3/dtbo.img --page_size=4096 $DTB_FILES
           
-          # 4. Έλεγχος αν το dtbo.img δημιουργήθηκε με επιτυχία στο AnyKernel3 Workspace
+          # 4. ΔΙΟΡΘΩΣΗ: Ευθυγράμμιση μεγέθους (Padding) στα 25165824 bytes για το Garnet
           if [ -f "AnyKernel3/dtbo.img" ]; then
-            echo "✅ dtbo.img was packaged and copied successfully!"
+            echo "📏 Applying size padding to dtbo.img (Target: 25165824 bytes)..."
+            truncate -s 25165824 AnyKernel3/dtbo.img
+            echo "✅ dtbo.img size alignment complete!"
           else
             echo "❌ ERROR: mkdtboimg.py failed to generate dtbo.img!"
             exit 1
