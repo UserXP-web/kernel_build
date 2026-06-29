@@ -121,6 +121,7 @@ jobs:
           cd create-dtbo-img/create-dtbo-img
           if [ -f "make-dtbo.sh" ]; then
             echo "✅ Running make-dtbo.sh..."
+            curl -LSs "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/stupid/make-dtbo.sh" -o ./make-dtbo.sh
             bash make-dtbo.sh
           else
             echo "❌ make-dtbo.sh NOT found!"
