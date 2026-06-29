@@ -114,6 +114,13 @@ jobs:
           # Εκκίνηση της μεταγλώττισης με απενεργοποίηση του frame limit warning μέσω KCFLAGS
           make -j$(nproc --all) O=out LLVM=1 LLVM_IAS=1 KCFLAGS="-Wno-frame-larger-than" Image
 
+      - name: dtbo maker
+        run: |
+          cd android/common
+          git clone https://github.com/zetaxbyte/create-dtbo-img-form-source-kernel.git --depth=1 create-dtbo-img
+          cd create-dtbo-img/create-dtbo-img
+          bash make-dtbo.sh
+
       - name: Download AnyKernel3 Base
         run: |
           cd $GITHUB_WORKSPACE
@@ -146,6 +153,10 @@ jobs:
 
       - name: Combine Compiled Image into AnyKernel3 Workspace
         run: |
+          out/arch/arm64/boot you will see 
+          if [ -f "android/common/out/arch/arm64/boot/dtbo.img" ]; then
+            cp android/common/out/arch/arm64/boot/dtbo.img AnyKernel3/dtbo.img
+          fi
           # ΔΙΟΡΘΩΣΗ: Παίρνουμε το έτοιμο, native Image.gz και το μετονομάζουμε σε Image για το AnyKernel3
           if [ -f "android/common/out/arch/arm64/boot/Image.gz" ]; then
             cp android/common/out/arch/arm64/boot/Image.gz AnyKernel3/Image
