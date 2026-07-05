@@ -202,7 +202,7 @@ jobs:
           #############################################################################################################
           mkdir -p kernel_workspace/common # android/common
           # Κάνουμε clone απευθείας μόνο τον πυρήνα του garnet για Android 16 (branch bka)
-          git clone --depth=1 -b bka "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet" android/common
+          git clone --depth=1 -b bka "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet" kernel_workspace/common
 
           # Clang — only download if cache missed
           if [ "${{ steps.clang-cache.outputs.cache-hit }}" != "true" ]; then
@@ -273,13 +273,13 @@ jobs:
 
       - name: Configure CCache Directory
         run: |
-          echo "CCACHE_DIR=$HOME/.ccache_6.6.139" >> $GITHUB_ENV
-          echo "LDCACHE_DIR=/dev/shm/ldcache_6.6.139" >> $GITHUB_ENV
-          mkdir -p /dev/shm/ldcache_6.6.139
+          echo "CCACHE_DIR=$HOME/.ccache_5.10.236" >> $GITHUB_ENV
+          echo "LDCACHE_DIR=/dev/shm/ldcache_5.10.236" >> $GITHUB_ENV
+          mkdir -p /dev/shm/ldcache_5.10.236
           echo "CCACHE_MAXSIZE=10G" >> $GITHUB_ENV
           echo "Current Disk Space:"
           df -h
-          echo "Current Build Kernel Version: 6.6.139"
+          echo "Current Build Kernel Version: 5.10.236"
 
       - name: Restore CCache
         uses: actions/cache/restore@v4
@@ -313,7 +313,7 @@ jobs:
           
           echo "Cache miss, attempting to pull public ccache..."
           mkdir -p ${{ env.CCACHE_DIR }}
-          FILE_NAME="ccache-6.6.139.tar.zst"
+          FILE_NAME="ccache-5.10.236.tar.zst"
           
           if gh release download -p "$FILE_NAME" -R cctv18/public_ccache; then
             echo "Successfully downloaded $FILE_NAME, extracting..."
@@ -360,7 +360,7 @@ jobs:
       
           echo "⬇️ Cloning patch repos..."
           if [ "${{ github.event.inputs.SUSFS }}" == "true" ]; then
-            git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android15-6.6 &
+            git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android12-5.10 &
             git clone --depth=1 https://github.com/WildKernels/kernel_patches.git wild_susfs_fix &
           fi
           git clone --depth=1 https://github.com/mrcxlinux/kernel_patches.git &
@@ -371,7 +371,7 @@ jobs:
           if [ "${{ github.event.inputs.SUSFS }}" == "true" ]; then
             echo "📝 Staging SUSFS files..."
             # kernel-side patch + source files → common/
-            cp susfs4ksu/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch ./common/
+            cp susfs4ksu/kernel_patches/50_add_susfs_in_gki-android12-5.10.patch ./common/
             cp susfs4ksu/kernel_patches/fs/* ./common/fs/
             cp susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
             # KSU-side enable patch → inside KernelSU-Next/
@@ -408,7 +408,7 @@ jobs:
             done
       
             echo "📦 [3/3] Applying 50_add_susfs kernel patch..."
-            patch -p1 < 50_add_susfs_in_gki-android15-6.6.patch
+            patch -p1 < 50_add_susfs_in_gki-android12-5.10.patch
           fi
       
           echo "✅ Base patches applied"
@@ -491,8 +491,8 @@ jobs:
           CONFIG_ZRAM_MEMORY_TRACKING=y
           EOF
 
-      - name: ⚙️ Apply Fengchi (HMBIRD) SCHED Patch
-        if: inputs.fengchi
+      - name: ⚙️ Apply Fengchi (HMBIRD) SCHED Patch        
+        if: inputs.fengchi && false
         run: |
           cd kernel_workspace/common
           if [ -d "kernel/sched/hmbird" ]; then
@@ -533,7 +533,7 @@ jobs:
           fi
 
       - name: Prepare CPU Optimizations (Oryon SM8750)
-        if: inputs.cpu_opt
+        if: inputs.cpu_opt && false
         run: |
           if [[ "${{ github.event.inputs.clang_version }}" == "clang18" ]]; then
             echo "EXTRA_CFLAGS=-march=armv9-a+crypto+dotprod" >> $GITHUB_ENV
@@ -551,8 +551,10 @@ jobs:
           echo "✅ Oryon flags prepared."
 
       - name: Apply Unicode Bypass Fix
+        if: false
         working-directory: kernel_workspace/common
         run: |
+          # NOT exist(?) for 5.10
           PATCH_URL="https://github.com/TheWildJames/kernel_patches/raw/main/common/unicode_bypass_fix_6.1+.patch"
           wget -qO /tmp/ub_fix.patch "$PATCH_URL" 2>/dev/null && \
             patch -p1 --forward < /tmp/ub_fix.patch || true
@@ -586,37 +588,62 @@ jobs:
             fi
           }
 
+          echo "optimized_mem_operations"
           apply_patch "optimized_mem_operations.patch"
+          echo "file_struct_8bytes_align"
           apply_patch "file_struct_8bytes_align.patch"
+          echo "reduce_cache_pressure"
           apply_patch "reduce_cache_pressure.patch"
+          echo "mem_opt_prefetch"
           apply_patch "mem_opt_prefetch.patch"
+          echo "optimise_memcmp"
           apply_patch "optimise_memcmp.patch"
+          echo "minimise_wakeup_time"
           apply_patch "minimise_wakeup_time.patch"
+          echo "int_sqrt"
           apply_patch "int_sqrt.patch"
+          echo "force_tcp_nodelay"
           apply_patch "force_tcp_nodelay.patch"
+          echo "reduce_gc_thread_sleep_time"
           apply_patch "reduce_gc_thread_sleep_time.patch"
+          echo "add_timeout_wakelocks_globally"
           apply_patch "add_timeout_wakelocks_globally.patch"
+          echo "f2fs_reduce_congestion"
           apply_patch "f2fs_reduce_congestion.patch"
+          echo "reduce_freeze_timeout"
           apply_patch "reduce_freeze_timeout.patch"
+          echo "clear_page_16bytes_align"
           apply_patch "clear_page_16bytes_align.patch"
+          echo "add_limitation_scaling_min_freq"
           apply_patch "add_limitation_scaling_min_freq.patch"
+          echo "re_write_limitation_scaling_min_freq"
           apply_patch "re_write_limitation_scaling_min_freq.patch"
+          echo "adjust_cpu_scan_order"
           apply_patch "adjust_cpu_scan_order.patch"
+          echo "avoid_extra_s2idle_wake_attempts"
           apply_patch "avoid_extra_s2idle_wake_attempts.patch"
+          echo "disable_cache_hot_buddy"
           apply_patch "disable_cache_hot_buddy.patch"
+          echo "f2fs_enlarge_min_fsync_blocks"
           apply_patch "f2fs_enlarge_min_fsync_blocks.patch"
+          echo "increase_ext4_default_commit_age"
           apply_patch "increase_ext4_default_commit_age.patch"
+          echo "increase_sk_mem_packets"
           apply_patch "increase_sk_mem_packets.patch"
+          echo "reduce_pci_pme_wakeups"
           apply_patch "reduce_pci_pme_wakeups.patch"
+          echo "silence_irq_cpu_logspam"
           apply_patch "silence_irq_cpu_logspam.patch"
+          echo "silence_system_logspam"
           apply_patch "silence_system_logspam.patch"
+          echo "use_unlikely_wrap_cpufreq"
           apply_patch "use_unlikely_wrap_cpufreq.patch"
 
           echo "✅ Optimization patches applied"
 
       # ── NEW: NTSync ──────────────────────────────────────────────────────────
       - name: Apply NTSync Patch
-        if: inputs.ntsync_enable
+        if: inputs.ntsync_enable && false
         working-directory: kernel_workspace/common
         run: |
           echo "Enabling NTSync (NT kernel sync primitives)..."
@@ -918,13 +945,13 @@ jobs:
 
           # RAM disk for build output (15GB RAM available, safe to use)
           mkdir -p /dev/shm/kout
-          mkdir -p /dev/shm/ldcache_6.6.139
+          mkdir -p /dev/shm/ldcache_5.10.236
 
           cd kernel_workspace/common
 
           # LTO thin cache wrapper pointing to RAM disk
           echo '#!/bin/bash' > ld-wrapper
-          echo 'ld.lld "$@" --thinlto-cache-dir=/dev/shm/ldcache_6.6.139 --thinlto-jobs=$(($(nproc --all) / 2))' >> ld-wrapper
+          echo 'ld.lld "$@" --thinlto-cache-dir=/dev/shm/ldcache_5.10.236 --thinlto-jobs=$(($(nproc --all) / 2))' >> ld-wrapper
           chmod +x ld-wrapper
 
           wget https://github.com/$GITHUB_REPOSITORY/raw/refs/heads/$GITHUB_REF_NAME/lib/libfakestat.so || true
@@ -961,7 +988,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: ccache-neov4-6.6.139-${{ runner.os }}-${{ github.ref_name }}-${{ github.run_id }}
+          key: ccache-5.10.236-${{ runner.os }}-${{ github.ref_name }}-${{ github.run_id }}
 
       - name: 📦 Save LTO CCache
         if: success() && inputs.lto_type == 'thin'
@@ -986,12 +1013,12 @@ jobs:
           if [[ "${{ github.event.inputs.lz4kd_enable }}" == "true" ]]; then
             wget https://raw.githubusercontent.com/$GITHUB_REPOSITORY/refs/heads/$GITHUB_REF_NAME/zram.zip || true
           fi
-          AK3_NAME=AnyKernel3_${KSU_TYPENAME}_${{ env.KSUVER }}_6.6.139_palaziks_AOSP-ShiftPorts.zip
-          FULL_VERSION=6.6.139-palaziks_AOSP-ShiftPorts
+          AK3_NAME=AnyKernel3_${KSU_TYPENAME}_${{ env.KSUVER }}_5.10.236_palaziks_AOSP-ShiftPorts.zip
+          FULL_VERSION=5.10.236-palaziks_AOSP-ShiftPorts
           zip -r ../$AK3_NAME ./*
           echo "ak3name=$AK3_NAME" >> $GITHUB_OUTPUT
           
-          TIME_NOW="$(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S')"
+          TIME_NOW="$(TZ='Europe/Athens' date +'%Y-%m-%d %H:%M:%S')"
           echo "Author: $GITHUB_ACTOR" > ./ak3.log
           echo "Repo: $GITHUB_REPOSITORY" >> ./ak3.log
           echo "Branch: $GITHUB_REF_NAME" >> ./ak3.log
@@ -1024,6 +1051,7 @@ jobs:
           path: ${{ github.workspace }}/kernel_workspace/AnyKernel*.zip
 
       - name: 📝 Make ZRAM module
+        if: false
         run: |
           ZRAM_KO=$(find /dev/shm/kout -name "zram.ko" | head -1)
           if [ -z "$ZRAM_KO" ]; then
@@ -1037,13 +1065,14 @@ jobs:
           echo "✅ Done!"
 
       - name: 📤 Upload zram.zip
+        if: false
         uses: actions/upload-artifact@v4
         with:
           name: zram-module
           path: ./zram/*
 
       - name: Send Telegram Notification (Success)
-        if: success()
+        if: success() && false
         env:
           TELEGRAPH_TOKEN: ${{ secrets.TELEGRAPH_TOKEN }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
@@ -1054,7 +1083,7 @@ jobs:
           COMMIT_MSG="Workflow Dispatch: 6.6.139"
           REPO_URL="https://github.com/${{ github.repository }}"
           RUN_URL="$REPO_URL/actions/runs/${{ github.run_id }}"
-          TIME_NOW="$(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S')"
+          TIME_NOW="$(TZ='Europe/Athens' date +'%Y-%m-%d %H:%M:%S')"
 
           export TG_KERNEL_VERSION="6.6.139"
           export TG_KSU_DISPLAY="KernelSU Next"
@@ -1106,7 +1135,7 @@ jobs:
               {"tag": "h4", "children": ["📋 Build Info"]},
               {"tag": "ul", "children": [
                   {"tag": "li", "children": [{"tag": "strong", "children": ["Device: "]}, "OnePlus 13 PJZ110 (CN) / SM8750"]},
-                  {"tag": "li", "children": [{"tag": "strong", "children": ["Kernel: "]}, f"{e('TG_KERNEL_VERSION')}-android15"]},
+                  {"tag": "li", "children": [{"tag": "strong", "children": ["Kernel: "]}, f"{e('TG_KERNEL_VERSION')}-android12"]},
                   {"tag": "li", "children": [{"tag": "strong", "children": ["Manager: "]}, f"{e('TG_KSU_DISPLAY')} v{e('TG_KSUVER')}"]},
                   {"tag": "li", "children": [{"tag": "strong", "children": ["Suffix: "]}, f"-{e('TG_SUFFIX')}"]},
                   {"tag": "li", "children": [{"tag": "strong", "children": ["LTO: "]}, e("TG_LTO")]},
@@ -1252,10 +1281,10 @@ jobs:
 
       - name: Set Environment Variables
         run: |
-          FULL_VERSION=6.6.139-palaziks-ShiftPorts
+          FULL_VERSION=5.10.236-palaziks-ShiftPorts
           echo "FULL_VERSION=$FULL_VERSION" >> $GITHUB_ENV
-          TIME="$(TZ='Asia/Shanghai' date +'%y%m%d%H%M%S')"
-          TIME_FORM="$(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S')"
+          TIME="$(TZ='Europe/Athens' date +'%y%m%d%H%M%S')"
+          TIME_FORM="$(TZ='Europe/Athens' date +'%Y-%m-%d %H:%M:%S')"
           echo "TIME=$TIME" >> $GITHUB_ENV
           echo "TIME_FORM=$TIME_FORM" >> $GITHUB_ENV
           TAG_HEAD="OPPO-OPlus-Realme-build"
