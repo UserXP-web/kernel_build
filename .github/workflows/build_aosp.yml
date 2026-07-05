@@ -9,7 +9,7 @@ env:
   ANDROID_VERSION: 'android12'
   KERNEL_VERSION: '5.10'
   KERNEL_NAME: 'android12-9-g29d86c5fc9dd-abogki428889875-4k'
-  CCACHE_KEY: ccache-neov4-5.10.236
+  CCACHE_KEY: ccache-5.10.236
 
 on:
   workflow_dispatch:
@@ -66,7 +66,7 @@ on:
         description: 'Enable Fengchi / HMBIRD Optimization'
         required: true
         type: boolean
-        default: true
+        default: false
       bore_enable:
         description: 'Enable BORE Scheduler (Burst-Oriented Response Enhancer, off by default)'
         required: true
@@ -86,7 +86,7 @@ on:
         description: 'CPU Optimizations (Oryon MCPU tuning for SM8750)'
         required: true
         type: boolean
-        default: true
+        default: false
       f2fs_opt:
         description: 'F2FS Optimizations (better flash storage performance)'
         required: true
@@ -192,13 +192,17 @@ jobs:
           sudo apt-get install -y --no-install-recommends -o Dpkg::Use-Pty=0 \
             libelf-dev dos2unix pahole cmake &
 
-          # Source clone
-          echo "Cloning source repository..."
-          curl -L https://github.com/palazik/android_kernel_common_oneplus_sm8750/archive/refs/heads/6.6.139_oneplus13_coloros16.zip \
-            -o common.zip &&
-          unzip -q common.zip &&
-          mv android_kernel_common_oneplus_sm8750-* common &&
-          rm -f common.zip &
+          ## Source clone
+          ##echo "Cloning source repository..."
+          ##curl -L https://github.com/palazik/android_kernel_common_oneplus_sm8750/archive/refs/heads/6.6.139_oneplus13_coloros16.zip \
+          ##  -o common.zip &&
+          ##unzip -q common.zip &&
+          ##mv android_kernel_common_oneplus_sm8750-* common &&
+          ##rm -f common.zip &
+          #############################################################################################################
+          mkdir -p kernel_workspace/common # android/common
+          # Κάνουμε clone απευθείας μόνο τον πυρήνα του garnet για Android 16 (branch bka)
+          git clone --depth=1 -b bka "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet" android/common
 
           # Clang — only download if cache missed
           if [ "${{ steps.clang-cache.outputs.cache-hit }}" != "true" ]; then
