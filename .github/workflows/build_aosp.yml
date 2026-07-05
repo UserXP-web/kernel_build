@@ -228,7 +228,7 @@ jobs:
 
           wait
 
-          echo "Removing ABI protection & dirty suffix..."
+          echo "<> Removing ABI protection & dirty suffix..."
           rm common/android/abi_gki_protected_exports_* || true
           for f in common/scripts/setlocalversion; do
             sed -i 's/ -dirty//g' "$f"
