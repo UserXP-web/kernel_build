@@ -200,6 +200,7 @@ jobs:
           ##mv android_kernel_common_oneplus_sm8750-* common &&
           ##rm -f common.zip &
           #############################################################################################################
+          echo "<> Clone source..."
           mkdir -p ./common # android/common
           # Κάνουμε clone απευθείας μόνο τον πυρήνα του garnet για Android 16 (branch bka)
           git clone --depth=1 -b bka "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet" ./common
