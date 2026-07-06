@@ -1,4 +1,4 @@
-name: Build Xiaomi Garnet Non-GKI Kernel
+name: AI clean - Garnet Non-GKI Kernel
 
 permissions:
   contents: write
