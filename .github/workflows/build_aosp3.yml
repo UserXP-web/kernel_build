@@ -89,17 +89,29 @@ jobs:
           
           ccache -s
 
-      - name: Prepare AnyKernel3 Files
+      - name: Prepare AnyKernel3 Files & Inject Properties
         run: |
           if [ ! -f android/common/out/arch/arm64/boot/Image ]; then
             echo "Error: Kernel Image was not compiled!"
             exit 1
           fi
           
+          # Αντιγραφή Kernel Image και DTBs στο AnyKernel3
           cp android/common/out/arch/arm64/boot/Image AnyKernel3/
           if [ -d android/common/out/arch/arm64/boot/dts ]; then
             find android/common/out/arch/arm64/boot/dts/ -name "*.dtb" -exec cp {} AnyKernel3/ \;
           fi
+          
+          # ΑΥΤΟΜΑΤΕΣ ΑΛΛΑΓΕΣ ΣΤΟ anykernel.sh (Injecting vendor_boot settings)
+          cd AnyKernel3
+          sed -i 's/do.devicecheck=0/do.devicecheck=1/g' anykernel.sh
+          sed -i 's/device.name1=/device.name1=garnet/g' anykernel.sh
+          
+          # Στόχευση του vendor_boot με ΚΕΦΑΛΑΙΑ γράμματα αν το template σας είναι έτσι ορισμένο
+          sed -i 's|BLOCK=.*|BLOCK=/dev/block/by-name/vendor_boot;|g' anykernel.sh
+          sed -i 's|block=.*|block=/dev/block/by-name/vendor_boot;|g' anykernel.sh
+          sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=1;/g' anykernel.sh
+          sed -i 's/is_slot_device=.*/is_slot_device=1;/g' anykernel.sh
 
       - name: Upload Flashable AnyKernel3 Zip Installer
         uses: actions/upload-artifact@v7
