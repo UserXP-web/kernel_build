@@ -49,16 +49,23 @@ jobs:
           make mrproper
           rm -rf out
           
-          export PATH="$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
+          # Δημιουργία αυτόματων symlinks για το ccache (Ο σωστός τρόπος για Android Kbuild)
+          mkdir -p $GITHUB_WORKSPACE/ccache_bin
+          ln -s $(which ccache) $GITHUB_WORKSPACE/ccache_bin/clang
+          ln -s $(which ccache) $GITHUB_WORKSPACE/ccache_bin/clang++
+          ln -s $(which ccache) $GITHUB_WORKSPACE/ccache_bin/ld.lld
           
-          # Ρυθμίσεις ccache για μέγιστη ταχύτητα
+          # Προσθήκη των ccache symlinks ΠΡΩΤΑ στο PATH και μετά του κανονικού Clang
+          export PATH="$GITHUB_WORKSPACE/ccache_bin:$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
+          
+          # Ρυθμίσεις ccache
           ccache -M 5G
           ccache -z
-          
+                    
           BUILD_ARGS="
             ARCH=arm64 \
             SUBARCH=arm64 \
-            CC=\"ccache clang\" \
+            CC=clang \
             LD=ld.lld \
             AR=llvm-ar \
             NM=llvm-nm \
@@ -80,7 +87,6 @@ jobs:
           
           make -j$(nproc --all) $BUILD_ARGS KCFLAGS="-Wno-frame-larger-than" Image dtbs
           
-          # Εμφάνιση στατιστικών του ccache στο τέλος του build
           ccache -s
 
       - name: Prepare AnyKernel3 Files
