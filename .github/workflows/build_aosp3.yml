@@ -82,15 +82,14 @@ jobs:
             ARCH=arm64 scripts/kconfig/merge_config.sh -O out out/.config arch/arm64/configs/vendor/garnet_GKI.config
           fi
 
-          # ΔΙΟΡΘΩΣΗ: Απενεργοποίηση του προβληματικού module mtdoops στο παραγόμενο .config
           sed -i 's/CONFIG_MTD_OOPS=m/CONFIG_MTD_OOPS=n/g' out/.config
           sed -i 's/CONFIG_MTD_OOPS=y/CONFIG_MTD_OOPS=n/g' out/.config
 
-          # 3. Μεταγλώττιση του Kernel, DTBs και Modules
+          # Μεταγλώττιση
           make -j$(nproc --all) $BUILD_ARGS KCFLAGS="-Wno-frame-larger-than" Image dtbs modules
           
-          # Εγκατάσταση των modules σε έναν προσωρινό φάκελο
-          make $BUILD_ARGS INSTALL_MOD_PATH=../modules_install modules_install
+          # ΔΙΟΡΘΩΣΗ: Χρήση απόλυτης διαδρομής για την εγκατάσταση των modules
+          make $BUILD_ARGS INSTALL_MOD_PATH=$GITHUB_WORKSPACE/modules_install modules_install
           
           ccache -s
 
@@ -101,17 +100,15 @@ jobs:
             exit 1
           fi
           
-          # 1. Αντιγραφή Kernel Image και DTBs
           cp android/common/out/arch/arm64/boot/Image AnyKernel3/
           if [ -d android/common/out/arch/arm64/boot/dts ]; then
             find android/common/out/arch/arm64/boot/dts/ -name "*.dtb" -exec cp {} AnyKernel3/ \;
           fi
           
-          # 2. ΔΙΟΡΘΩΣΗ: Αναδρομική αναζήτηση για .ko αρχεία σε όλο τον κατάλογο
+          # ΔΙΟΡΘΩΣΗ: Αντιγραφή των .ko από την καθορισμένη απόλυτη διαδρομή
           mkdir -p AnyKernel3/modules/vendor/lib/modules
-          find android/modules_install/ -name "*.ko" -exec cp {} AnyKernel3/modules/vendor/lib/modules/ \;
-                    
-          # 3. Ρυθμίσεις του anykernel.sh (Inplace patching στο vendor_boot που διαχειρίζεται τα modules)
+          find $GITHUB_WORKSPACE/modules_install/ -name "*.ko" -exec cp {} AnyKernel3/modules/vendor/lib/modules/ \;
+
           cd AnyKernel3
           sed -i 's/do.devicecheck=0/do.devicecheck=1/g' anykernel.sh
           sed -i 's/device.name1=/device.name1=garnet/g' anykernel.sh
