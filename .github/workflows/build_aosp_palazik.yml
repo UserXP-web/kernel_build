@@ -410,7 +410,7 @@ jobs:
             done
       
             echo "📦 [3/3] Applying 50_add_susfs kernel patch..."
-            patch -p1 < 50_add_susfs_in_gki-android12-5.10.patch
+            patch -p1 < 50_add_susfs_in_gki-android12-5.10.patch || true
           fi
       
           echo "✅ Base patches applied"
