@@ -1,4 +1,4 @@
-name: Build Android AOSP Kernel (AnyKernel3)
+name: Build AOSP Kernel (AnyKernel3)
 
 on:
   workflow_dispatch:
@@ -85,12 +85,8 @@ jobs:
           sed -i 's/CONFIG_MTD_OOPS=m/CONFIG_MTD_OOPS=n/g' out/.config
           sed -i 's/CONFIG_MTD_OOPS=y/CONFIG_MTD_OOPS=n/g' out/.config
 
-          # Μεταγλώττιση
-          make -j$(nproc --all) $BUILD_ARGS KCFLAGS="-Wno-frame-larger-than" Image dtbs modules
-          
-          # ΔΙΟΡΘΩΣΗ: Χρήση απόλυτης διαδρομής για την εγκατάσταση των modules
-          make $BUILD_ARGS INSTALL_MOD_PATH=$GITHUB_WORKSPACE/modules_install modules_install
-          
+          make -j$(nproc --all) $BUILD_ARGS KCFLAGS="-Wno-frame-larger-than" Image dtbs
+
           ccache -s
 
       - name: Prepare AnyKernel3 Files & Inject Pure Flash
