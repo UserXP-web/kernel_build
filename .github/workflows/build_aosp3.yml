@@ -107,10 +107,10 @@ jobs:
             find android/common/out/arch/arm64/boot/dts/ -name "*.dtb" -exec cp {} AnyKernel3/ \;
           fi
           
-          # 2. ΑΥΤΟΜΑΤΗ ΑΝΤΙΓΡΑΦΗ ΤΩΝ .KO MODULES ΜΕΣΑ ΣΤΟ ANYKERNEL3
+          # 2. ΔΙΟΡΘΩΣΗ: Αναδρομική αναζήτηση για .ko αρχεία σε όλο τον κατάλογο
           mkdir -p AnyKernel3/modules/vendor/lib/modules
-          find android/modules_install/lib/modules/ -name "*.ko" -exec cp {} AnyKernel3/modules/vendor/lib/modules/ \;
-          
+          find android/modules_install/ -name "*.ko" -exec cp {} AnyKernel3/modules/vendor/lib/modules/ \;
+                    
           # 3. Ρυθμίσεις του anykernel.sh (Inplace patching στο vendor_boot που διαχειρίζεται τα modules)
           cd AnyKernel3
           sed -i 's/do.devicecheck=0/do.devicecheck=1/g' anykernel.sh
