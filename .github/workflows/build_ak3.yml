@@ -100,20 +100,33 @@ jobs:
         run: |
           cd android/common
           
+          # Προσθήκη του Clang στο PATH
           export PATH="$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
           
+          # Καθολικές μεταβλητές αρχιτεκτονικής
           export ARCH=arm64
           export SUBARCH=arm64
           export CLANG_TRIPLE=aarch64-linux-gnu-
           
+          # Καθολικές μεταβλητές LLVM για να επηρεάζουν και το merge_config
+          export CC=clang
+          export LD=ld.lld
+          export AR=llvm-ar
+          export NM=llvm-nm
+          export OBJCOPY=llvm-objcopy
+          export OBJDUMP=llvm-objdump
+          export READELF=llvm-readelf
+          export STRIP=llvm-strip
+          
           # Δημιουργία του βασικού GKI configuration
           make O=out LLVM=1 LLVM_IAS=1 gki_defconfig
           
-          # Συγχώνευση των ειδικών ρυθμίσεων του Garnet πάνω στο GKI config
-          scripts/kconfig/merge_config.sh -O out out/.config arch/arm64/configs/vendor/garnet_GKI.config
+          # Συγχώνευση των ειδικών ρυθμίσεων περνώντας τις LLVM παραμέτρους
+          ARCH=arm64 scripts/kconfig/merge_config.sh -O out out/.config arch/arm64/configs/vendor/garnet_GKI.config
           
-          # ΔΙΟΡΘΩΣΗ: Αλλαγή από 'dtbo' σε 'dtbs' για να χτιστούν τα Device Trees
-          make -j$(nproc --all) O=out LLVM=1 LLVM_IAS=1 KCFLAGS="-Wno-frame-larger-than" Image dtbs
+          # Τελική μεταγλώττιση
+          #make -j$(nproc --all) O=out LLVM=1 LLVM_IAS=1 KCFLAGS="-Wno-frame-larger-than" Image dtbs
+          make -j$(nproc --all) O=out LLVM=1 LLVM_IAS=1 KCFLAGS="-Wno-frame-larger-than" Image
 
       - name: Download AnyKernel3 Base
         run: |
