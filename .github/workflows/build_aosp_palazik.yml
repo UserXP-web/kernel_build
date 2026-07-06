@@ -1,4 +1,4 @@
-name: KernelSU Next garnet AOSP Build
+name: KernelSU Next garnet AOSP (palazik)
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-5.10.236
