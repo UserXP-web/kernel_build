@@ -203,7 +203,8 @@ jobs:
           echo "<> Clone source..."
           mkdir -p ./common # android/common
           # Κάνουμε clone απευθείας μόνο τον πυρήνα του garnet για Android 16 (branch bka)
-          git clone --depth=1 -b bka "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet" ./common
+          #git clone --depth=1 -b bka "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet" ./common
+          git clone --depth=1 "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet" -b Zen-Itsu-Garnet ./common
 
           # Clang — only download if cache missed
           if [ "${{ steps.clang-cache.outputs.cache-hit }}" != "true" ]; then
