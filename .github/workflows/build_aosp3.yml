@@ -43,7 +43,7 @@ jobs:
           #git clone --depth=1 "https://github.com/UserXP-web/android_kernel_xiaomi_sm7435" -b lineage-23.2 android/common
           git clone --depth=1 "https://github.com/osm0sis/AnyKernel3" AnyKernel3
 
-      - name: Compile Kernel Image & Modules
+      - name: Compile Kernel Image & Boot Image
         run: |
           cd android/common
           make clean
@@ -55,13 +55,11 @@ jobs:
           ln -s $(which ccache) $GITHUB_WORKSPACE/ccache_bin/clang++
           ln -s $(which ccache) $GITHUB_WORKSPACE/ccache_bin/ld.lld
           
-          #export PATH="$GITHUB_WORKSPACE/ccache_bin:$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
-          export PATH="$GITHUB_WORKSPACE/ccache_bin:$GITHUB_WORKSPACE/toolchains/clang/bin:$GITHUB_WORKSPACE/toolchains/gcc64/bin:$GITHUB_WORKSPACE/toolchains/gcc32/bin:$PATH"
+          export PATH="$GITHUB_WORKSPACE/ccache_bin:$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
           
           ccache -M 5G
           ccache -z
           
-          # Επιστροφή σε καθαρό LLVM_IAS=1
           BUILD_ARGS="
             ARCH=arm64 \
             SUBARCH=arm64 \
@@ -78,7 +76,7 @@ jobs:
             CLANG_TRIPLE=aarch64-linux-gnu- \
             O=out
           "
-
+          
           make $BUILD_ARGS gki_defconfig
           
           if [ -f arch/arm64/configs/vendor/garnet_GKI.config ]; then
@@ -88,10 +86,35 @@ jobs:
           sed -i 's/CONFIG_MTD_OOPS=m/CONFIG_MTD_OOPS=n/g' out/.config
           sed -i 's/CONFIG_MTD_OOPS=y/CONFIG_MTD_OOPS=n/g' out/.config
 
-          # ΚΛΕΨΙΜΟ: Προσθήκη των έξυπνων KCFLAGS για να μην κρασάρει ο compiler από warnings
-          make -j$(nproc --all) $BUILD_ARGS KCFLAGS="-O2 -pipe -Wno-error -Wno-implicit-function-declaration -Wno-implicit-int -Wno-format -Wno-unknown-warning-option" Image dtbs
+          # ΔΙΟΡΘΩΣΗ: Ζητάμε από το Kbuild να παράξει ΚΑΙ το boot.img [⚠️]
+          make -j$(nproc --all) $BUILD_ARGS KCFLAGS="-O2 -pipe -Wno-error -Wno-implicit-function-declaration -Wno-implicit-int -Wno-format -Wno-unknown-warning-option" Image boot.img
           
           ccache -s
+
+      - name: Prepare Final Boot Image
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/Garnet_Output          
+          # Έλεγχος αν το Kbuild έφτιαξε το boot.img
+          if [ -f android/common/out/boot.img ]; then
+            cp android/common/out/boot.img $GITHUB_WORKSPACE/Garnet_Output/boot.img
+            echo "Success: Real boot.img generated!"
+          elif [ -f android/common/out/arch/arm64/boot/Image ]; then
+            # Αν ο kernel δεν έχει ενσωματωμένο ramdisk, αντιγράφουμε το Image ως boot.img
+            cp android/common/out/arch/arm64/boot/Image $GITHUB_WORKSPACE/Garnet_Output/boot.img
+            echo "Notice: Clean Image renamed to boot.img"
+          else
+            echo "Error: Compilation failed!"
+            exit 1
+          fi
+          cp $GITHUB_WORKSPACE/Garnet_Output/boot.img AnyKernel3/boot.img
+
+      - name: Upload Flashable Kernel Boot Image
+        uses: actions/upload-artifact@v7
+        with:
+          name: Zen-ItsuKernel-Garnet-BootImage
+          path: ${{ github.workspace }}/Garnet_Output/boot.img
+          if-no-files-found: error
+          compression-level: 9
 
       - name: Prepare AnyKernel3 Files & Inject Pure Flash
         run: |
@@ -100,9 +123,8 @@ jobs:
             exit 1
           fi
           
-          # 1. Αντιγραφή ΜΟΝΟ του Kernel Image (Όπως είδαμε, τα DTB δεν χρειάζονται στο boot)
           #cp android/common/out/arch/arm64/boot/Image AnyKernel3/
-          cp android/common/out/arch/arm64/boot/Image AnyKernel3/boot.img
+          #cp android/common/out/arch/arm64/boot/Image AnyKernel3/boot.img
           
           # 2. Καθαρισμός και χτίσιμο του anykernel.sh από την αρχή για Header v4 Pure Flash
           cd AnyKernel3
