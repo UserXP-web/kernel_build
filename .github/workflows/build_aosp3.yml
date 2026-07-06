@@ -39,7 +39,8 @@ jobs:
 
       - name: Clone Kernel Source and AnyKernel3
         run: |
-          git clone --depth=1 "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet" -b Zen-Itsu-Garnet android/common
+          #git clone --depth=1 "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet" -b Zen-Itsu-Garnet android/common
+          git clone --depth=1 "https://github.com/UserXP-web/android_kernel_xiaomi_sm7435" -b lineage-23.2 android/common
           git clone --depth=1 "https://github.com/osm0sis/AnyKernel3" AnyKernel3
 
       - name: Compile Kernel Image & Modules
