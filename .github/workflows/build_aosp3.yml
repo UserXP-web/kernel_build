@@ -1,0 +1,104 @@
+name: Build Android AOSP Kernel (AnyKernel3)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-kernel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Workflow Repository
+        uses: actions/checkout@v4
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential ccache flex g++-multilib \
+            gcc-multilib git gnupg gperf lib32readline-dev lib32z1-dev liblz4-tool \
+            libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop \
+            pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python3 lld llvm wget
+
+      # Προσθήκη GitHub Cache για το ccache
+      - name: Setup Kernel ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ${{ runner.os }}-kernel-ccache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-kernel-ccache-
+
+      - name: Download Clang Toolchain
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/toolchains/clang
+          cd $GITHUB_WORKSPACE/toolchains
+          echo "Download clang..."
+          curl -L "/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r522817.tar.gz" -o clang.tar.gz
+          echo "Done. Extracting..."
+          tar -xzf clang.tar.gz -C clang/ && rm clang.tar.gz
+          echo "Done."
+
+      - name: Clone Kernel Source and AnyKernel3
+        run: |
+          git clone --depth=1 "/UserXP-web/Zen-ItsuKernel-Garnet" -b main android/common
+          git clone --depth=1 "/osm0sis/AnyKernel3" AnyKernel3
+
+      - name: Compile Kernel Image
+        run: |
+          cd android/common
+          make clean
+          make mrproper
+          rm -rf out
+          
+          export PATH="$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
+          
+          # Ρυθμίσεις ccache για μέγιστη ταχύτητα
+          ccache -M 5G
+          ccache -z
+          
+          BUILD_ARGS="
+            ARCH=arm64 \
+            SUBARCH=arm64 \
+            CC=\"ccache clang\" \
+            LD=ld.lld \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump \
+            READELF=llvm-readelf \
+            STRIP=llvm-strip \
+            LLVM=1 \
+            LLVM_IAS=1 \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            O=out
+          "
+          
+          make $BUILD_ARGS gki_defconfig
+          
+          if [ -f arch/arm64/configs/vendor/garnet_GKI.config ]; then
+            ARCH=arm64 scripts/kconfig/merge_config.sh -O out out/.config arch/arm64/configs/vendor/garnet_GKI.config
+          fi
+          
+          make -j$(nproc --all) $BUILD_ARGS KCFLAGS="-Wno-frame-larger-than" Image dtbs
+          
+          # Εμφάνιση στατιστικών του ccache στο τέλος του build
+          ccache -s
+
+      - name: Prepare AnyKernel3 Files
+        run: |
+          if [ ! -f android/common/out/arch/arm64/boot/Image ]; then
+            echo "Error: Kernel Image was not compiled!"
+            exit 1
+          fi
+          
+          cp android/common/out/arch/arm64/boot/Image AnyKernel3/
+          if [ -d android/common/out/arch/arm64/boot/dts ]; then
+            find android/common/out/arch/arm64/boot/dts/ -name "*.dtb" -exec cp {} AnyKernel3/ \;
+          fi
+
+      - name: Upload Flashable AnyKernel3 Zip Installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: Zen-ItsuKernel-Garnet-AnyKernel3
+          path: ${{ github.workspace }}/AnyKernel3/**
+          if-no-files-found: ignore
+          compression-level: 9
