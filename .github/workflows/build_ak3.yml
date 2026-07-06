@@ -62,26 +62,27 @@ jobs:
           echo "Done."
 
       - name: ⬇️ Download Source Code (Evolution X Kernel Only)
+        if: false
         run: |
           mkdir -p android/common
           # Κάνουμε clone απευθείας μόνο τον πυρήνα του garnet για Android 16 (branch bka)
           git clone --depth=1 -b bka "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet" android/common
       - name: ⬇️ Download Source Code via Repo Tool
-        if: false
+        if: true
         run: |
           mkdir -p android && cd android
 
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
 
-          #echo "🌐 Initialize kernel repository..."
-          #MANIFEST_URL="https://github.com/UserXP-web/kernel_build" # ${{ env.manifest_url }}
-          #MANIFEST_BRANCH="main" # ${{ env.manifest_branch }}
-          #MANIFEST_XML="manifest/zylhdrXP.xml" # manifest/${{ inputs.MANIFEST_selection }}.xml
-          echo "🌐 Initialize Evolution X kernel repository..."
-          MANIFEST_URL="https://github.com/Evolution-X/manifest"
-          MANIFEST_BRANCH="bka"
-          MANIFEST_XML="default.xml"
+          echo "🌐 Initialize kernel repository..."
+          MANIFEST_URL="https://github.com/UserXP-web/kernel_build" # ${{ env.manifest_url }}
+          MANIFEST_BRANCH="main" # ${{ env.manifest_branch }}
+          MANIFEST_XML="manifest/Zen-Itsu.xml" # manifest/${{ inputs.MANIFEST_selection }}.xml
+          #echo "🌐 Initialize Evolution X kernel repository..."
+          #MANIFEST_URL="https://github.com/Evolution-X/manifest"
+          #MANIFEST_BRANCH="bka"
+          #MANIFEST_XML="default.xml"
           echo "~ $MANIFEST_URL ^^^ $MANIFEST_BRANCH --- $MANIFEST_XML"        
           repo init --depth=1 -u $MANIFEST_URL -b $MANIFEST_BRANCH -m $MANIFEST_XML
   
