@@ -87,21 +87,17 @@ jobs:
           sed -i 's/CONFIG_MTD_OOPS=y/CONFIG_MTD_OOPS=n/g' out/.config
 
           # ΔΙΟΡΘΩΣΗ: Ζητάμε από το Kbuild να παράξει ΚΑΙ το boot.img [⚠️]
-          make -j$(nproc --all) $BUILD_ARGS KCFLAGS="-O2 -pipe -Wno-error -Wno-implicit-function-declaration -Wno-implicit-int -Wno-format -Wno-unknown-warning-option" Image boot.img
-          
+          make -j$(nproc --all) $BUILD_ARGS KCFLAGS="-O2 -pipe -Wno-error -Wno-implicit-function-declaration -Wno-implicit-int -Wno-format -Wno-unknown-warning-option" Image dtbs
+
           ccache -s
 
       - name: Prepare Final Boot Image
         run: |
           mkdir -p $GITHUB_WORKSPACE/Garnet_Output          
-          # Έλεγχος αν το Kbuild έφτιαξε το boot.img
-          if [ -f android/common/out/boot.img ]; then
-            cp android/common/out/boot.img $GITHUB_WORKSPACE/Garnet_Output/boot.img
-            echo "Success: Real boot.img generated!"
-          elif [ -f android/common/out/arch/arm64/boot/Image ]; then
-            # Αν ο kernel δεν έχει ενσωματωμένο ramdisk, αντιγράφουμε το Image ως boot.img
+          # Παίρνουμε το Image και το μετονομάζουμε απευθείας σε boot.img
+          if [ -f android/common/out/arch/arm64/boot/Image ]; then
             cp android/common/out/arch/arm64/boot/Image $GITHUB_WORKSPACE/Garnet_Output/boot.img
-            echo "Notice: Clean Image renamed to boot.img"
+            echo "Success: Compiled Image copied as boot.img"
           else
             echo "Error: Compilation failed!"
             exit 1
