@@ -81,8 +81,12 @@ jobs:
           if [ -f arch/arm64/configs/vendor/garnet_GKI.config ]; then
             ARCH=arm64 scripts/kconfig/merge_config.sh -O out out/.config arch/arm64/configs/vendor/garnet_GKI.config
           fi
-          
-          # ΔΙΟΡΘΩΣΗ: Προσθήκη 'modules' στην εντολή make για να χτιστούν οι οδηγοί
+
+          # ΔΙΟΡΘΩΣΗ: Απενεργοποίηση του προβληματικού module mtdoops στο παραγόμενο .config
+          sed -i 's/CONFIG_MTD_OOPS=m/CONFIG_MTD_OOPS=n/g' out/.config
+          sed -i 's/CONFIG_MTD_OOPS=y/CONFIG_MTD_OOPS=n/g' out/.config
+
+          # 3. Μεταγλώττιση του Kernel, DTBs και Modules
           make -j$(nproc --all) $BUILD_ARGS KCFLAGS="-Wno-frame-larger-than" Image dtbs modules
           
           # Εγκατάσταση των modules σε έναν προσωρινό φάκελο
