@@ -29,18 +29,26 @@ jobs:
 
       - name: Download Clang Toolchain
         run: |
-          mkdir -p $GITHUB_WORKSPACE/toolchains/clang
-          cd $GITHUB_WORKSPACE/toolchains
-          echo "Download clang..."
-          curl -L "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r522817.tar.gz" -o clang.tar.gz
-          echo "Done. Extracting..."
-          tar -xzf clang.tar.gz -C clang/ && rm clang.tar.gz
-          echo "Done."
+          mkdir -p $GITHUB_WORKSPACE/toolchains/gcc64
+          curl -L "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz" -o gcc64.tar.gz
+          tar -xzf gcc64.tar.gz -C $GITHUB_WORKSPACE/toolchains/gcc64 && rm gcc64.tar.gz
+          
+          mkdir -p $GITHUB_WORKSPACE/toolchains/gcc32
+          curl -L "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz" -o gcc32.tar.gz
+          tar -xzf gcc32.tar.gz -C $GITHUB_WORKSPACE/toolchains/gcc32 && rm gcc32.tar.gz
+
+          #mkdir -p $GITHUB_WORKSPACE/toolchains/clang
+          #cd $GITHUB_WORKSPACE/toolchains
+          #echo "Download clang..."
+          #curl -L "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r522817.tar.gz" -o clang.tar.gz
+          #echo "Done. Extracting..."
+          #tar -xzf clang.tar.gz -C clang/ && rm clang.tar.gz
+          #echo "Done."
 
       - name: Clone Kernel Source and AnyKernel3
         run: |
-          #git clone --depth=1 "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet" -b Zen-Itsu-Garnet android/common
-          git clone --depth=1 "https://github.com/UserXP-web/android_kernel_xiaomi_sm7435" -b lineage-23.2 android/common
+          git clone --depth=1 "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet" -b Zen-Itsu-Garnet android/common
+          #git clone --depth=1 "https://github.com/UserXP-web/android_kernel_xiaomi_sm7435" -b lineage-23.2 android/common
           git clone --depth=1 "https://github.com/osm0sis/AnyKernel3" AnyKernel3
 
       - name: Compile Kernel Image & Modules
@@ -55,7 +63,8 @@ jobs:
           ln -s $(which ccache) $GITHUB_WORKSPACE/ccache_bin/clang++
           ln -s $(which ccache) $GITHUB_WORKSPACE/ccache_bin/ld.lld
           
-          export PATH="$GITHUB_WORKSPACE/ccache_bin:$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
+          #export PATH="$GITHUB_WORKSPACE/ccache_bin:$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
+          export PATH="$GITHUB_WORKSPACE/ccache_bin:$GITHUB_WORKSPACE/toolchains/clang/bin:$GITHUB_WORKSPACE/toolchains/gcc64/bin:$GITHUB_WORKSPACE/toolchains/gcc32/bin:$PATH"
           
           ccache -M 5G
           ccache -z
@@ -72,11 +81,13 @@ jobs:
             READELF=llvm-readelf \
             STRIP=llvm-strip \
             LLVM=1 \
-            LLVM_IAS=1 \
+            LLVM_IAS=0 \
             CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-android- \
+            CROSS_COMPILE_ARM32=arm-linux-androideabi- \
             O=out
           "
-          
+
           make $BUILD_ARGS gki_defconfig
           
           if [ -f arch/arm64/configs/vendor/garnet_GKI.config ]; then
@@ -98,7 +109,8 @@ jobs:
           fi
           
           # 1. Αντιγραφή ΜΟΝΟ του Kernel Image (Όπως είδαμε, τα DTB δεν χρειάζονται στο boot)
-          cp android/common/out/arch/arm64/boot/Image AnyKernel3/
+          #cp android/common/out/arch/arm64/boot/Image AnyKernel3/
+          cp android/common/out/arch/arm64/boot/Image AnyKernel3/boot.img
           
           # 2. Καθαρισμός και χτίσιμο του anykernel.sh από την αρχή για Header v4 Pure Flash
           cd AnyKernel3
@@ -138,7 +150,7 @@ jobs:
           
           # PURE KERNEL FLASH (Δεν ανοίγει, δεν κλείνει, απλά αντικαθιστά το Image)
           # Αυτή η μέθοδος παρακάμπτει το Repack Error σε Header v4
-          flash_generic; 
+          flash_generic boot;
           
           ## end boot install
           EOF
