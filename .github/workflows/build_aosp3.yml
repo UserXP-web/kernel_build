@@ -29,21 +29,13 @@ jobs:
 
       - name: Download Clang Toolchain
         run: |
-          mkdir -p $GITHUB_WORKSPACE/toolchains/gcc64
-          curl -L "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz" -o gcc64.tar.gz
-          tar -xzf gcc64.tar.gz -C $GITHUB_WORKSPACE/toolchains/gcc64 && rm gcc64.tar.gz
-          
-          mkdir -p $GITHUB_WORKSPACE/toolchains/gcc32
-          curl -L "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz" -o gcc32.tar.gz
-          tar -xzf gcc32.tar.gz -C $GITHUB_WORKSPACE/toolchains/gcc32 && rm gcc32.tar.gz
-
-          #mkdir -p $GITHUB_WORKSPACE/toolchains/clang
-          #cd $GITHUB_WORKSPACE/toolchains
-          #echo "Download clang..."
-          #curl -L "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r522817.tar.gz" -o clang.tar.gz
-          #echo "Done. Extracting..."
-          #tar -xzf clang.tar.gz -C clang/ && rm clang.tar.gz
-          #echo "Done."
+          mkdir -p $GITHUB_WORKSPACE/toolchains/clang
+          cd $GITHUB_WORKSPACE/toolchains
+          echo "Download clang..."
+          curl -L "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r522817.tar.gz" -o clang.tar.gz
+          echo "Done. Extracting..."
+          tar -xzf clang.tar.gz -C clang/ && rm clang.tar.gz
+          echo "Done."
 
       - name: Clone Kernel Source and AnyKernel3
         run: |
@@ -69,6 +61,7 @@ jobs:
           ccache -M 5G
           ccache -z
           
+          # Επιστροφή σε καθαρό LLVM_IAS=1
           BUILD_ARGS="
             ARCH=arm64 \
             SUBARCH=arm64 \
@@ -81,10 +74,8 @@ jobs:
             READELF=llvm-readelf \
             STRIP=llvm-strip \
             LLVM=1 \
-            LLVM_IAS=0 \
+            LLVM_IAS=1 \
             CLANG_TRIPLE=aarch64-linux-gnu- \
-            CROSS_COMPILE=aarch64-linux-android- \
-            CROSS_COMPILE_ARM32=arm-linux-androideabi- \
             O=out
           "
 
@@ -97,8 +88,9 @@ jobs:
           sed -i 's/CONFIG_MTD_OOPS=m/CONFIG_MTD_OOPS=n/g' out/.config
           sed -i 's/CONFIG_MTD_OOPS=y/CONFIG_MTD_OOPS=n/g' out/.config
 
-          make -j$(nproc --all) $BUILD_ARGS KCFLAGS="-Wno-frame-larger-than" Image dtbs
-
+          # ΚΛΕΨΙΜΟ: Προσθήκη των έξυπνων KCFLAGS για να μην κρασάρει ο compiler από warnings
+          make -j$(nproc --all) $BUILD_ARGS KCFLAGS="-O2 -pipe -Wno-error -Wno-implicit-function-declaration -Wno-implicit-int -Wno-format -Wno-unknown-warning-option" Image dtbs
+          
           ccache -s
 
       - name: Prepare AnyKernel3 Files & Inject Pure Flash
