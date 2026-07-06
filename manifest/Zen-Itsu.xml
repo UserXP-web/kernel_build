@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest>
   <remote name="aosp" fetch="https://android.googlesource.com" review="https://android-review.googlesource.com/" />
-  <remote name="Zen-Itsu" fetch="https://github.com/UserXP-web/" revision="lineage-23.2" />
+  <remote name="Zen-Itsu" fetch="https://github.com/UserXP-web/" revision="Zen-Itsu-Garnet" />
   <default revision="master-kernel-build-2021" remote="aosp" sync-j="4" />
   
   <superproject name="kernel/superproject" remote="aosp" revision="common-android12-5.10-2025-12" />
 
-  <project path="common" name="Zen-ItsuKernel-Garnet" clone-depth="1" remote="Zen-Itsu-Garnet" />
+  <project path="common" name="Zen-ItsuKernel-Garnet" clone-depth="1" remote="Zen-Itsu" />
     
   <project path="build" name="kernel/build" />
   <project path="hikey-modules" name="kernel/hikey-modules" revision="2e97927f068cd9d92a4b8039ef64c4467ca8985b" upstream="android12-5.10" dest-branch="android12-5.10" />
