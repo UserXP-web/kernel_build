@@ -93,29 +93,58 @@ jobs:
           
           ccache -s
 
-      - name: Prepare AnyKernel3 Files & Inject Modules
+      - name: Prepare AnyKernel3 Files & Inject Pure Flash
         run: |
           if [ ! -f android/common/out/arch/arm64/boot/Image ]; then
             echo "Error: Kernel Image was not compiled!"
             exit 1
           fi
           
+          # 1. Αντιγραφή ΜΟΝΟ του Kernel Image (Όπως είδαμε, τα DTB δεν χρειάζονται στο boot)
           cp android/common/out/arch/arm64/boot/Image AnyKernel3/
-          if [ -d android/common/out/arch/arm64/boot/dts ]; then
-            find android/common/out/arch/arm64/boot/dts/ -name "*.dtb" -exec cp {} AnyKernel3/ \;
-          fi
           
-          # ΔΙΟΡΘΩΣΗ: Αντιγραφή των .ko από την καθορισμένη απόλυτη διαδρομή
-          mkdir -p AnyKernel3/modules/vendor/lib/modules
-          find $GITHUB_WORKSPACE/modules_install/ -name "*.ko" -exec cp {} AnyKernel3/modules/vendor/lib/modules/ \;
-
+          # 2. Καθαρισμός και χτίσιμο του anykernel.sh από την αρχή για Header v4 Pure Flash
           cd AnyKernel3
-          sed -i 's/do.devicecheck=0/do.devicecheck=1/g' anykernel.sh
-          sed -i 's/device.name1=/device.name1=garnet/g' anykernel.sh
-          sed -i 's|BLOCK=.*|BLOCK=/dev/block/by-name/vendor_boot;|g' anykernel.sh
-          sed -i 's|block=.*|block=/dev/block/by-name/vendor_boot;|g' anykernel.sh
-          sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=1;/g' anykernel.sh
-          sed -i 's/is_slot_device=.*/is_slot_device=1;/g' anykernel.sh
+          
+          cat << 'EOF' > anykernel.sh
+          ### AnyKernel3 Ramdisk Mod Script
+          ## osm0sis @ xda-developers
+          
+          ### AnyKernel setup
+          # global properties
+          properties() { '
+          kernel.string=Garnet Kernel for AOSP(?)
+          do.devicecheck=1
+          do.modules=0
+          do.systemless=1
+          do.cleanup=1
+          do.cleanuponabort=0
+          device.name1=garnet
+          device.name2=
+          device.name3=
+          device.name4=
+          device.name5=
+          supported.versions=
+          supported.patchlevels=
+          supported.vendorpatchlevels=
+          '; } # end properties
+          
+          
+          ### AnyKernel install
+          
+          # TARGET BOOT PARTITION
+          BLOCK=/dev/block/by-name/boot;
+          IS_SLOT_DEVICE=1;
+          
+          # Εισαγωγή των core functions
+          . tools/ak3-core.sh;
+          
+          # PURE KERNEL FLASH (Δεν ανοίγει, δεν κλείνει, απλά αντικαθιστά το Image)
+          # Αυτή η μέθοδος παρακάμπτει το Repack Error σε Header v4
+          flash_generic; 
+          
+          ## end boot install
+          EOF
 
       - name: Upload Flashable AnyKernel3 Zip Installer
         uses: actions/upload-artifact@v7
