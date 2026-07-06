@@ -188,9 +188,9 @@ jobs:
           mkdir -p kernel_workspace/clang-r563880c kernel_workspace/build-tools
           cd kernel_workspace
 
-          # apt — stripped to bare minimum, no purge/man-db waste
+          # apt — stripped to bare minimum, no purge/man-db waste (clang?)
           sudo apt-get install -y --no-install-recommends -o Dpkg::Use-Pty=0 \
-            libelf-dev dos2unix pahole cmake &
+            libelf-dev dos2unix pahole cmake lld llvm libssl-dev repo wget &
 
           ## Source clone
           ##echo "Cloning source repository..."
