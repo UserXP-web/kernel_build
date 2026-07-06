@@ -32,15 +32,15 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/toolchains/clang
           cd $GITHUB_WORKSPACE/toolchains
           echo "Download clang..."
-          curl -L "/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r522817.tar.gz" -o clang.tar.gz
+          curl -L "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r522817.tar.gz" -o clang.tar.gz
           echo "Done. Extracting..."
           tar -xzf clang.tar.gz -C clang/ && rm clang.tar.gz
           echo "Done."
 
       - name: Clone Kernel Source and AnyKernel3
         run: |
-          git clone --depth=1 "/UserXP-web/Zen-ItsuKernel-Garnet" -b main android/common
-          git clone --depth=1 "/osm0sis/AnyKernel3" AnyKernel3
+          git clone --depth=1 "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet" -b main android/common
+          git clone --depth=1 "https://github.com/osm0sis/AnyKernel3" AnyKernel3
 
       - name: Compile Kernel Image
         run: |
