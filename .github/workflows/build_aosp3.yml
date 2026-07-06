@@ -42,26 +42,23 @@ jobs:
           git clone --depth=1 "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet" -b Zen-Itsu-Garnet android/common
           git clone --depth=1 "https://github.com/osm0sis/AnyKernel3" AnyKernel3
 
-      - name: Compile Kernel Image
+      - name: Compile Kernel Image & Modules
         run: |
           cd android/common
           make clean
           make mrproper
           rm -rf out
           
-          # Δημιουργία αυτόματων symlinks για το ccache (Ο σωστός τρόπος για Android Kbuild)
           mkdir -p $GITHUB_WORKSPACE/ccache_bin
           ln -s $(which ccache) $GITHUB_WORKSPACE/ccache_bin/clang
           ln -s $(which ccache) $GITHUB_WORKSPACE/ccache_bin/clang++
           ln -s $(which ccache) $GITHUB_WORKSPACE/ccache_bin/ld.lld
           
-          # Προσθήκη των ccache symlinks ΠΡΩΤΑ στο PATH και μετά του κανονικού Clang
           export PATH="$GITHUB_WORKSPACE/ccache_bin:$GITHUB_WORKSPACE/toolchains/clang/bin:$PATH"
           
-          # Ρυθμίσεις ccache
           ccache -M 5G
           ccache -z
-                    
+          
           BUILD_ARGS="
             ARCH=arm64 \
             SUBARCH=arm64 \
@@ -85,29 +82,35 @@ jobs:
             ARCH=arm64 scripts/kconfig/merge_config.sh -O out out/.config arch/arm64/configs/vendor/garnet_GKI.config
           fi
           
-          make -j$(nproc --all) $BUILD_ARGS KCFLAGS="-Wno-frame-larger-than" Image dtbs
+          # ΔΙΟΡΘΩΣΗ: Προσθήκη 'modules' στην εντολή make για να χτιστούν οι οδηγοί
+          make -j$(nproc --all) $BUILD_ARGS KCFLAGS="-Wno-frame-larger-than" Image dtbs modules
+          
+          # Εγκατάσταση των modules σε έναν προσωρινό φάκελο
+          make $BUILD_ARGS INSTALL_MOD_PATH=../modules_install modules_install
           
           ccache -s
 
-      - name: Prepare AnyKernel3 Files & Inject Properties
+      - name: Prepare AnyKernel3 Files & Inject Modules
         run: |
           if [ ! -f android/common/out/arch/arm64/boot/Image ]; then
             echo "Error: Kernel Image was not compiled!"
             exit 1
           fi
           
-          # Αντιγραφή Kernel Image και DTBs στο AnyKernel3
+          # 1. Αντιγραφή Kernel Image και DTBs
           cp android/common/out/arch/arm64/boot/Image AnyKernel3/
           if [ -d android/common/out/arch/arm64/boot/dts ]; then
             find android/common/out/arch/arm64/boot/dts/ -name "*.dtb" -exec cp {} AnyKernel3/ \;
           fi
           
-          # ΑΥΤΟΜΑΤΕΣ ΑΛΛΑΓΕΣ ΣΤΟ anykernel.sh (Injecting vendor_boot settings)
+          # 2. ΑΥΤΟΜΑΤΗ ΑΝΤΙΓΡΑΦΗ ΤΩΝ .KO MODULES ΜΕΣΑ ΣΤΟ ANYKERNEL3
+          mkdir -p AnyKernel3/modules/vendor/lib/modules
+          find android/modules_install/lib/modules/ -name "*.ko" -exec cp {} AnyKernel3/modules/vendor/lib/modules/ \;
+          
+          # 3. Ρυθμίσεις του anykernel.sh (Inplace patching στο vendor_boot που διαχειρίζεται τα modules)
           cd AnyKernel3
           sed -i 's/do.devicecheck=0/do.devicecheck=1/g' anykernel.sh
           sed -i 's/device.name1=/device.name1=garnet/g' anykernel.sh
-          
-          # Στόχευση του vendor_boot με ΚΕΦΑΛΑΙΑ γράμματα αν το template σας είναι έτσι ορισμένο
           sed -i 's|BLOCK=.*|BLOCK=/dev/block/by-name/vendor_boot;|g' anykernel.sh
           sed -i 's|block=.*|block=/dev/block/by-name/vendor_boot;|g' anykernel.sh
           sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=1;/g' anykernel.sh
