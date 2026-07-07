@@ -484,7 +484,7 @@ jobs:
           patch -p1 -F 3 < lz4kd.patch || true
 
           # Fix missing ZSTD_DEF_LEVEL macro caused by the patch overwrite
-          sed -i '/#include <crypto\/internal\/scompress.h>/a #define ZSTD_DEF_LEVEL 3' ./crypto/zstd.c
+          sed -i '1i #define ZSTD_DEF_LEVEL 3' ./crypto/zstd.c
 
       - name: Configure ZRAM Writeback
         if: inputs.zram_writeback
