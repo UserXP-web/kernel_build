@@ -485,8 +485,8 @@ jobs:
 
       - name: Force Fix Stock Crypto ZSTD Macro
         run: |
-          # Fixes the macro for both stock code and patch code
-          sed -i '1i #define ZSTD_DEF_LEVEL 3' **/kernel_workspace/common/crypto/zstd.c
+          # Fixes the macro using the direct relative workspace path
+          sed -i '1i #define ZSTD_DEF_LEVEL 3' kernel_workspace/common/crypto/zstd.c
 
       - name: Configure ZRAM Writeback
         if: inputs.zram_writeback
