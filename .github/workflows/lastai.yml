@@ -32,6 +32,9 @@ jobs:
       - name: 🧩 Merge Defconfigs
         run: |
           cd source
+          # Καθαρισμός του source tree για να επιτραπεί το out-of-tree build
+          make ARCH=arm64 mrproper
+          
           ARCH=arm64 ./scripts/kconfig/merge_config.sh \
             arch/arm64/configs/gki_defconfig \
             arch/arm64/configs/vendor/garnet_GKI.config
@@ -42,6 +45,10 @@ jobs:
           export PATH="$(pwd)/../clang/linux-x86/clang-r530567/bin:$PATH"
           
           sed -i 's/CONFIG_ANDROID_KABI_PROTECT=y/CONFIG_ANDROID_KABI_PROTECT=n/g' .config
+          
+          # Μεταφέρουμε το έτοιμο .config στον φάκελο out
+          mkdir -p out
+          mv .config out/.config
           
           make -j$(nproc --all) \
             O=out \
