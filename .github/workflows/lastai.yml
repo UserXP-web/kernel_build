@@ -51,27 +51,33 @@ jobs:
         run: |
           cd source
           
+          # Εντοπισμός του φακέλου bin του Clang
           CLANG_BIN=$(find ../clang -type d -name "bin" | head -n 1)
           export PATH="$CLANG_BIN:$PATH"
           
+          # Απενεργοποίηση του KABI
           sed -i 's/CONFIG_ANDROID_KABI_PROTECT=y/CONFIG_ANDROID_KABI_PROTECT=n/g' out/.config
           
+          # 1. Εκτέλεση olddefconfig με ρητό ορισμό του LLVM PATH
           make -j$(nproc --all) \
             O=out \
             ARCH=arm64 \
             CC=clang \
             LLVM=1 \
             LLVM_IAS=1 \
+            LLVM_PATH="$CLANG_BIN/" \
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
             olddefconfig
 
+          # 2. Εκτέλεση Image Build με ρητό ορισμό του LLVM PATH
           make -j$(nproc --all) \
             O=out \
             ARCH=arm64 \
             CC=clang \
             LLVM=1 \
             LLVM_IAS=1 \
+            LLVM_PATH="$CLANG_BIN/" \
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
             Image
