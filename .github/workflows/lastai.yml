@@ -32,11 +32,12 @@ jobs:
       - name: 🧩 Merge Defconfigs
         run: |
           cd source
-          # 1. Πλήρης εξαφάνιση παλιών καταλοιπόν και φακέλων
           rm -rf out .config
           make ARCH=arm64 mrproper
           
-          # 2. Δημιουργία του out και εκτέλεση του merge ΑΠΕΥΘΕΙΑΣ εκεί μέσα
+          # Προσθήκη του Clang στο PATH για να βρει το script τον σωστό linker
+          export PATH="$(pwd)/../clang/linux-x86/clang-r530567/bin:$PATH"
+          
           mkdir -p out
           ARCH=arm64 ./scripts/kconfig/merge_config.sh \
             -O out \
@@ -46,9 +47,9 @@ jobs:
       - name: 🔨 Compile Valid Image
         run: |
           cd source
+          # Προσθήκη του Clang στο PATH και για το build
           export PATH="$(pwd)/../clang/linux-x86/clang-r530567/bin:$PATH"
           
-          # 3. Τροποποίηση του KABI απευθείας στο σωστό .config μέσα στο out
           sed -i 's/CONFIG_ANDROID_KABI_PROTECT=y/CONFIG_ANDROID_KABI_PROTECT=n/g' out/.config
           
           make -j$(nproc --all) \
