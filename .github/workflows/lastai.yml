@@ -86,7 +86,7 @@ jobs:
 
       - name: 📦 Prepare AnyKernel3
         run: |
-          git clone --depth=1 "/osm0sis/AnyKernel3" AnyKernel3
+          git clone --depth=1 "https://github.com/osm0sis/AnyKernel3" AnyKernel3
           cp source/out/arch/arm64/boot/Image AnyKernel3/
           cd AnyKernel3
           sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel.sh
