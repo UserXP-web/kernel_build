@@ -19,11 +19,9 @@ jobs:
         run: |
           mkdir -p clang
           cd clang
-          # Λήψη του ελαφριού prebuilt αρχείου
-          wget "https://github.com/userariii/AOSP-clang/releases/download/clang-r530567/clang-r530567.tar.gz"
-          # Αποσυμπίεση των εργαλείων μεταγλώττισης
-          tar -xf clang-r530567.tar.gz
-          rm clang-r530567.tar.gz
+          wget -O clang-r563880c.tar.gz "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android16-qpr2-release/clang-r563880c.tar.gz"
+          tar -xf clang-r563880c.tar.gz
+          rm clang-r563880c.tar.gz
 
       - name: 🌲 Clone Kernel Source
         run: |
@@ -51,16 +49,15 @@ jobs:
         run: |
           cd source
           
-          # Ορισμός του σωστού, κεντρικού φακέλου bin του Clang
+          # Ορισμός του σωστού φακέλου bin του Clang 21
           CLANG_PATH=$(realpath ../clang/bin)
           export PATH="$CLANG_PATH:$PATH"
           
-          # 1. Απενεργοποίηση του KABI και αύξηση του ορίου Stack Frame στα 8192 λόγω KernelSU
-          sed -i 's/CONFIG_ANDROID_KABI_PROTECT=y/CONFIG_ANDROID_KABI_PROTECT=n/g' out/.config
-          sed -i 's/CONFIG_FRAME_WARN=2048/CONFIG_FRAME_WARN=8192/g' out/.config
-          sed -i 's/CONFIG_FRAME_WARN=4096/CONFIG_FRAME_WARN=8192/g' out/.config
+          # 1. Ενεργοποιούμε το Full LTO απευθείας στο config για να βγει 43MB
+          sed -i 's/CONFIG_LTO_CLANG_THIN=y/# CONFIG_LTO_CLANG_THIN is not set/g' out/.config
+          echo "CONFIG_LTO_CLANG_FULL=y" >> out/.config
           
-          # 2. Εκτέλεση olddefconfig για να εφαρμοστούν οι αλλαγές
+          # 2. Εκτέλεση olddefconfig
           make -j$(nproc --all) \
             O=out \
             ARCH=arm64 \
