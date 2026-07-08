@@ -213,20 +213,21 @@ jobs:
           ##mv android_kernel_common_oneplus_sm8750-* common &&
           ##rm -f common.zip &
           #############################################################################################################
-          #echo "<> Clone source..."
-          #mkdir -p ./common # android/common
+          echo "<> Clone source..."
+          mkdir -p ./common # android/common
           #git clone --depth=1 -b bka "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet" ./common
-          #git clone --depth=1 "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet" -b Zen-Itsu-Garnet ./common
-          echo "🌐 Initialize kernel repository..."
-          #mkdir -p android && cd android          
-          MANIFEST_URL="https://github.com/UserXP-web/kernel_build" # ${{ env.manifest_url }}
-          MANIFEST_BRANCH="main" # ${{ env.manifest_branch }}
-          MANIFEST_XML="manifest/zylhdrXP.xml" # manifest/${{ inputs.MANIFEST_selection }}.xml
-          echo "~ $MANIFEST_URL ^^^ $MANIFEST_BRANCH --- $MANIFEST_XML"        
-          repo init --depth=1 -u $MANIFEST_URL -b $MANIFEST_BRANCH -m $MANIFEST_XML
-          echo "🔄 Synchronize the codebase (using $(nproc --all) threads)..."
-          repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle --force-sync
-          echo "✅ Kernel source code cloning complete"
+          git clone --depth=1 "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet" -b Zen-Itsu-Garnet ./common
+          
+          #echo "🌐 Initialize kernel repository..."
+          ##mkdir -p android && cd android          
+          #MANIFEST_URL="https://github.com/UserXP-web/kernel_build" # ${{ env.manifest_url }}
+          #MANIFEST_BRANCH="main" # ${{ env.manifest_branch }}
+          #MANIFEST_XML="manifest/zylhdrXP.xml" # manifest/${{ inputs.MANIFEST_selection }}.xml
+          #echo "~ $MANIFEST_URL ^^^ $MANIFEST_BRANCH --- $MANIFEST_XML"        
+          #repo init --depth=1 -u $MANIFEST_URL -b $MANIFEST_BRANCH -m $MANIFEST_XML
+          #echo "🔄 Synchronize the codebase (using $(nproc --all) threads)..."
+          #repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle --force-sync
+          #echo "✅ Kernel source code cloning complete"
 
 
           # Clang — only download if cache missed
@@ -1027,7 +1028,7 @@ jobs:
           path: ${{ env.LDCACHE_DIR }}
           key: lto-cache-${{ runner.os }}-${{ github.ref_name }}-${{ github.run_id }}
 
-      - name: 🧠 Package AK3 ZIP
+      - name: 🧠 ~Package AK3 ZIP
         id: create_zip
         run: |
           cd kernel_workspace
@@ -1045,7 +1046,7 @@ jobs:
           fi
           AK3_NAME=AnyKernel3_${KSU_TYPENAME}_${{ env.KSUVER }}_5.10.236_palaziks_AOSP-ShiftPorts.zip
           FULL_VERSION=5.10.236-palaziks_AOSP-ShiftPorts
-          zip -r ../$AK3_NAME ./*
+          #zip -r ../$AK3_NAME ./*
           echo "ak3name=$AK3_NAME" >> $GITHUB_OUTPUT
           
           TIME_NOW="$(TZ='Europe/Athens' date +'%Y-%m-%d %H:%M:%S')"
@@ -1072,13 +1073,15 @@ jobs:
           echo "TTL: ${{ github.event.inputs.ttl_enable }}" >> ./ak3.log
           echo "MemOpt: ${{ github.event.inputs.mem_opt_patches }}" >> ./ak3.log
           echo "BORE: ${{ github.event.inputs.bore_enable }}" >> ./ak3.log
-          zip -z ../$AK3_NAME < ./ak3.log
+          #zip -z ../$AK3_NAME < ./ak3.log
 
       - name: 📤 Upload AnyKernel3
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.create_zip.outputs.ak3name }}
-          path: ${{ github.workspace }}/kernel_workspace/AnyKernel*.zip
+          path: ${{ github.workspace }}/kernel_workspace/AnyKernel3/**
+          if-no-files-found: ignore
+          compression-level: 9
 
       - name: 📝 Make ZRAM module
         if: false
