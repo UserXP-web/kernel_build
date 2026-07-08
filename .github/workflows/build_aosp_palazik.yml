@@ -439,12 +439,6 @@ jobs:
       
           echo "✅ Base patches applied"
 
-      - name: 🧩 Merge Vendor Defconfig
-        run: |
-          cd kernel_workspace/common
-          # Ενώνουμε το gki_defconfig με το ειδικό config του garnet που βρίσκεται μέσα στο vendor/
-          ARCH=arm64 ./scripts/kconfig/merge_config.sh arch/arm64/configs/gki_defconfig arch/arm64/configs/vendor/garnet_GKI.config
-
       - name: ⚙️ Configure Kernel Options
         run: |
           cd kernel_workspace
@@ -965,6 +959,12 @@ jobs:
           sudo sed -i "s/-4k/-palaziks-ShiftPorts/g" ./common/arch/arm64/configs/gki_defconfig
           sed -i 's/${scm_version}//' ./common/scripts/setlocalversion
           echo "CONFIG_LOCALVERSION_AUTO=n" >> ./common/arch/arm64/configs/gki_defconfig
+
+      - name: 🧩 Merge Vendor Defconfig
+        run: |
+          cd kernel_workspace/common
+          # Ενώνουμε το βασικό GKI με το hardware profile του garnet
+          ARCH=arm64 ./scripts/kconfig/merge_config.sh arch/arm64/configs/gki_defconfig arch/arm64/configs/vendor/garnet_GKI.config
 
       - name: 🔨 Build Kernel
         run: |
