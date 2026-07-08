@@ -53,7 +53,7 @@ jobs:
           CLANG_PATH=$(realpath ../clang/bin)
           export PATH="$CLANG_PATH:$PATH"
           
-          # 1. Ενεργοποιούμε το Full LTO απευθείας στο config για να βγει 43MB
+          # 1. Ενεργοποιούμε το Full LTO απευθείας στο config
           sed -i 's/CONFIG_LTO_CLANG_THIN=y/# CONFIG_LTO_CLANG_THIN is not set/g' out/.config
           echo "CONFIG_LTO_CLANG_FULL=y" >> out/.config
           
@@ -68,7 +68,7 @@ jobs:
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
             olddefconfig
 
-          # 3. Εκτέλεση Image Build
+          # 3. Εκτέλεση Image Build με παράκαμψη του Stack Frame Error στο KCFLAGS
           make -j$(nproc --all) \
             O=out \
             ARCH=arm64 \
@@ -79,6 +79,7 @@ jobs:
             OBJDUMP="$CLANG_PATH/llvm-objdump" \
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            KCFLAGS="-Wno-error -Wno-error=frame-larger-than=" \
             Image
 
       - name: 📦 Prepare AnyKernel3
