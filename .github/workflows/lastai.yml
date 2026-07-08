@@ -55,10 +55,11 @@ jobs:
           CLANG_PATH=$(realpath ../clang/bin)
           export PATH="$CLANG_PATH:$PATH"
           
-          # Απενεργοποίηση του KABI
+          # 1. Απενεργοποίηση του KABI και αύξηση του ορίου Stack Frame από 2048 σε 4096
           sed -i 's/CONFIG_ANDROID_KABI_PROTECT=y/CONFIG_ANDROID_KABI_PROTECT=n/g' out/.config
+          sed -i 's/CONFIG_FRAME_WARN=2048/CONFIG_FRAME_WARN=4096/g' out/.config
           
-          # 1. Εκτέλεση olddefconfig
+          # 2. Εκτέλεση olddefconfig για να εφαρμοστούν οι αλλαγές
           make -j$(nproc --all) \
             O=out \
             ARCH=arm64 \
@@ -69,7 +70,7 @@ jobs:
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
             olddefconfig
 
-          # 2. Εκτέλεση Image Build
+          # 3. Εκτέλεση Image Build
           make -j$(nproc --all) \
             O=out \
             ARCH=arm64 \
