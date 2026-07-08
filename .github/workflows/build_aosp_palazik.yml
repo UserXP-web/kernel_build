@@ -439,6 +439,12 @@ jobs:
       
           echo "✅ Base patches applied"
 
+      - name: 🧩 Merge Vendor Defconfig
+        run: |
+          cd kernel_workspace/common
+          # Ενώνουμε το gki_defconfig με το ειδικό config του garnet που βρίσκεται μέσα στο vendor/
+          ARCH=arm64 ./scripts/kconfig/merge_config.sh arch/arm64/configs/gki_defconfig arch/arm64/configs/vendor/garnet_GKI.config
+
       - name: ⚙️ Configure Kernel Options
         run: |
           cd kernel_workspace
