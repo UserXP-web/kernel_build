@@ -55,9 +55,10 @@ jobs:
           CLANG_PATH=$(realpath ../clang/bin)
           export PATH="$CLANG_PATH:$PATH"
           
-          # 1. Απενεργοποίηση του KABI και αύξηση του ορίου Stack Frame από 2048 σε 4096
+          # 1. Απενεργοποίηση του KABI και αύξηση του ορίου Stack Frame στα 8192 λόγω KernelSU
           sed -i 's/CONFIG_ANDROID_KABI_PROTECT=y/CONFIG_ANDROID_KABI_PROTECT=n/g' out/.config
-          sed -i 's/CONFIG_FRAME_WARN=2048/CONFIG_FRAME_WARN=4096/g' out/.config
+          sed -i 's/CONFIG_FRAME_WARN=2048/CONFIG_FRAME_WARN=8192/g' out/.config
+          sed -i 's/CONFIG_FRAME_WARN=4096/CONFIG_FRAME_WARN=8192/g' out/.config
           
           # 2. Εκτέλεση olddefconfig για να εφαρμοστούν οι αλλαγές
           make -j$(nproc --all) \
