@@ -960,12 +960,6 @@ jobs:
           sed -i 's/${scm_version}//' ./common/scripts/setlocalversion
           echo "CONFIG_LOCALVERSION_AUTO=n" >> ./common/arch/arm64/configs/gki_defconfig
 
-      - name: 🧩 Merge Vendor Defconfig
-        run: |
-          cd kernel_workspace/common
-          # Ενώνουμε το βασικό GKI με το hardware profile του garnet
-          ARCH=arm64 ./scripts/kconfig/merge_config.sh arch/arm64/configs/gki_defconfig arch/arm64/configs/vendor/garnet_GKI.config
-
       - name: 🔨 Build Kernel
         run: |
           WORKDIR="$(pwd)"
@@ -999,12 +993,22 @@ jobs:
           export FAKETIME="@2025-05-25 13:00:00"
           export PRELOAD_LIBS="$SO_DIR/libfakestat.so $SO_DIR/libfaketimeMT.so"
 
+
+          # 1. Καθαρισμός και αρχική δημιουργία του φακέλου εξόδου
+          mkdir -p /dev/shm/kout
+          # 2. Επίσημο Merge του Google GKI με το Xiaomi Garnet config απευθείας στον φάκελο build
+          ARCH=arm64 ./scripts/kconfig/merge_config.sh \
+            -O /dev/shm/kout \
+            arch/arm64/configs/gki_defconfig \
+            arch/arm64/configs/vendor/garnet_GKI.config
+
+
           # defconfig pass — output to RAM disk
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
             CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD="$(pwd)/ld-wrapper" \
             O=/dev/shm/kout \
             KCFLAGS="-O2 -pipe -Wno-error -Wno-implicit-function-declaration -Wno-implicit-int -Wno-default-const-init-var-unsafe -Wno-format -Wno-unknown-warning-option" \
-            gki_defconfig
+            olddefconfig
 
           # Image build — output to RAM disk
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
