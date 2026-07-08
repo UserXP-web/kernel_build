@@ -35,8 +35,9 @@ jobs:
           rm -rf out .config
           make ARCH=arm64 mrproper
           
-          # Προσθήκη του Clang στο PATH για να βρει το script τον σωστό linker
-          export PATH="$(pwd)/../clang/linux-x86/clang-r530567/bin:$PATH"
+          # Δυναμικός εντοπισμός του φακέλου bin του Clang
+          CLANG_BIN=$(find ../clang -type d -name "bin" | head -n 1)
+          export PATH="$CLANG_BIN:$PATH"
           
           mkdir -p out
           ARCH=arm64 ./scripts/kconfig/merge_config.sh \
@@ -47,8 +48,10 @@ jobs:
       - name: 🔨 Compile Valid Image
         run: |
           cd source
-          # Προσθήκη του Clang στο PATH και για το build
-          export PATH="$(pwd)/../clang/linux-x86/clang-r530567/bin:$PATH"
+          
+          # Δυναμικός εντοπισμός του φακέλου bin του Clang και για το build
+          CLANG_BIN=$(find ../clang -type d -name "bin" | head -n 1)
+          export PATH="$CLANG_BIN:$PATH"
           
           sed -i 's/CONFIG_ANDROID_KABI_PROTECT=y/CONFIG_ANDROID_KABI_PROTECT=n/g' out/.config
           
