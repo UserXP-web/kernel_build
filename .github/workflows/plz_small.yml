@@ -1,15 +1,15 @@
-name: 🚀 Kernel AOSP Build
+name: Kernel AOSP Garnet Build
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-5.10.236
+  group: ${{ github.workflow }}-${{ github.ref }}-5.10-garnet
   cancel-in-progress: true
 
 env:
   TZ: Europe/Athens
-  ANDROID_VERSION: 'android12'
+  ANDROID_VERSION: 'android14'
   KERNEL_VERSION: '5.10'
-  KERNEL_NAME: 'android12-5.10.236-abogki'
-  CCACHE_KEY: ccache-neov4-5.10.236
+  KERNEL_NAME: 'kernel_xiaomi_garnet'
+  CCACHE_KEY: ccache-garnet-5.10
 
 on:
   workflow_dispatch:
@@ -72,25 +72,10 @@ jobs:
             libelf-dev dos2unix pahole cmake &
 
 
-          #echo "Cloning source repository..."
-          #curl -L https://github.com/palazik/android_kernel_common_oneplus_sm8750/archive/refs/heads/6.6.139_oneplus13_coloros16.zip \
-          #  -o common.zip &&
-          #unzip -q common.zip &&
-          #mv android_kernel_common_oneplus_sm8750-* common &&
-          #rm -f common.zip &
-          #############################################################################################################
-          # Λήψη του επίσημου, ενημερωμένου GKI Android Common Kernel 5.10 από τη Google
+          # Αντικατάσταση Πηγής: Κατέβασμα του Vendor Kernel της Evolution-X για το Garnet
           echo "Cloning source repository..."
-          curl -L "https://android.googlesource.com/kernel/common/+archive/refs/heads/android12-5.10.tar.gz" \
-            -o common.tar.gz &&
-          mkdir -p common &&
-          tar -xzf common.tar.gz -C common &&
-          rm -f common.tar.gz &
-
-          #echo "<> Clone source..."
-          #mkdir -p ./common # android/common
-          ##git clone --depth=1 -b bka "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet" ./common
-          #git clone --depth=1 "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet" -b Zen-Itsu-Garnet ./common
+          git clone --depth=1 https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet -b uqpr2 common &          
+          #git clone --depth=1 "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet" -b Zen-Itsu-Garnet ./common &
 
           #echo "🌐 Initialize kernel repository..."
           ##mkdir -p android && cd android          
@@ -102,7 +87,7 @@ jobs:
           #echo "🔄 Synchronize the codebase (using $(nproc --all) threads)..."
           #repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle --force-sync
           #echo "✅ Kernel source code cloning complete"
-          
+
 
           if [ "${{ steps.clang-cache.outputs.cache-hit }}" != "true" ]; then
             echo "Cache miss — downloading clang-r563880c..."
@@ -169,13 +154,13 @@ jobs:
 
       - name: Configure CCache Directory
         run: |
-          echo "CCACHE_DIR=$HOME/.ccache_5.10.236" >> $GITHUB_ENV
-          echo "LDCACHE_DIR=$GITHUB_WORKSPACE/ldcache_5.10.236" >> $GITHUB_ENV
-          mkdir -p $GITHUB_WORKSPACE/ldcache_5.10.236
+          echo "CCACHE_DIR=$HOME/.ccache_garnet" >> $GITHUB_ENV
+          echo "LDCACHE_DIR=$GITHUB_WORKSPACE/ldcache_garnet" >> $GITHUB_ENV
+          mkdir -p $GITHUB_WORKSPACE/ldcache_garnet
           echo "CCACHE_MAXSIZE=10G" >> $GITHUB_ENV
           echo "Current Disk Space:"
           df -h
-          echo "Current Build Kernel Version: 5.10.236"
+          echo "Current Build Kernel Version: 5.10-Garnet"
 
       - name: Restore CCache
         uses: actions/cache@v4
@@ -209,7 +194,7 @@ jobs:
           
           echo "Cache miss, attempting to pull public ccache..."
           mkdir -p ${{ env.CCACHE_DIR }}
-          FILE_NAME="ccache-5.10.236.tar.zst"
+          FILE_NAME="ccache-garnet.tar.zst"
           
           if gh release download -p "$FILE_NAME" -R cctv18/public_ccache; then
             echo "Successfully downloaded $FILE_NAME, extracting..."
@@ -244,8 +229,12 @@ jobs:
           cd kernel_workspace
           DEFCONFIG="./common/arch/arm64/configs/gki_defconfig"
       
+          # Ραψιμο Modules & Drivers (Στρατηγική built-in drivers)
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$DEFCONFIG"
           echo "CONFIG_HEADERS_INSTALL=n"               >> "$DEFCONFIG"
+          echo "CONFIG_MODULES=y"                        >> "$DEFCONFIG"
+          echo "CONFIG_IKCONFIG=y"                       >> "$DEFCONFIG"
+          echo "CONFIG_IKCONFIG_PROC=y"                  >> "$DEFCONFIG"
 
       - name: Configure LTO
         run: |
@@ -265,57 +254,6 @@ jobs:
           sed -i 's/${scm_version}//' ./common/scripts/setlocalversion
           echo "CONFIG_LOCALVERSION_AUTO=n" >> ./common/arch/arm64/configs/gki_defconfig
 
-      - name: 🔨 Build Kernel (OLD)
-        if: false
-        run: |
-          WORKDIR="$(pwd)"
-          export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
-          export PATH="$WORKDIR/kernel_workspace/clang-r563880c/bin:$WORKDIR/kernel_workspace/build-tools/linux-x86/bin:$PATH"
-          CLANG_DIR="$WORKDIR/kernel_workspace/clang-r563880c/bin"
-          echo "Clang: $($CLANG_DIR/clang --version | head -n 1)"
-          echo "LLD:   $($CLANG_DIR/ld.lld --version | head -n 1)"
-          pahole --version 2>/dev/null || echo "Pahole: Not Installed"
-
-          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
-          export CCACHE_LOGFILE="${{ github.workspace }}/kernel_workspace/ccache.log"
-          export CCACHE_IS_KERNEL_COMPILING=true
-
-          mkdir -p $GITHUB_WORKSPACE/kout
-          mkdir -p $GITHUB_WORKSPACE/ldcache_5.10.236
-
-          cd kernel_workspace/common
-
-          echo '#!/bin/bash' > ld-wrapper
-          echo 'ld.lld "$@" --thinlto-cache-dir=$GITHUB_WORKSPACE/ldcache_5.10.236 --thinlto-jobs=$(($(nproc --all) / 2))' >> ld-wrapper
-          chmod +x ld-wrapper
-
-          wget https://github.com/$GITHUB_REPOSITORY/raw/refs/heads/$GITHUB_REF_NAME/lib/libfakestat.so || true
-          wget https://github.com/$GITHUB_REPOSITORY/raw/refs/heads/$GITHUB_REF_NAME/lib/libfaketimeMT.so || true
-          chmod 777 ./*.so || true
-          SO_DIR=$(pwd)
-          export FAKESTAT="2025-05-25 12:00:00"
-          export FAKETIME="@2025-05-25 13:00:00"
-          export PRELOAD_LIBS="$SO_DIR/libfakestat.so $SO_DIR/libfaketimeMT.so"
-
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
-            CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD="$(pwd)/ld-wrapper" \
-            O=$GITHUB_WORKSPACE/kout \
-            KCFLAGS="-O2 -pipe -Wno-error -Wno-implicit-function-declaration -Wno-implicit-int -Wno-default-const-init-var-unsafe -Wno-format -Wno-unknown-warning-option" \
-            gki_defconfig
-
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
-            CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD="$(pwd)/ld-wrapper" \
-            O=$GITHUB_WORKSPACE/kout \
-            KCFLAGS="-O2 -pipe -Wno-error -Wno-implicit-function-declaration -Wno-implicit-int -Wno-default-const-init-var-unsafe -Wno-format -Wno-unknown-warning-option ${EXTRA_CFLAGS:-} ${MAP}" \
-            Image
-
-          echo "Kernel Compilation Complete!"
-          ccache -c
-          ccache --evict-older-than 10800s
-          echo "CCache Status:"
-          ccache -s
-          df -h
-
       - name: 🔨 Build Kernel
         run: |
           WORKDIR="$(pwd)"
@@ -331,26 +269,34 @@ jobs:
           export CCACHE_IS_KERNEL_COMPILING=true
 
           mkdir -p $GITHUB_WORKSPACE/kout
-          mkdir -p $GITHUB_WORKSPACE/ldcache_5.10.236
+          mkdir -p $GITHUB_WORKSPACE/ldcache_garnet
 
           cd kernel_workspace/common
 
           echo '#!/bin/bash' > ld-wrapper
-          echo 'ld.lld "$@" --thinlto-cache-dir=$GITHUB_WORKSPACE/ldcache_5.10.236 --thinlto-jobs=$(($(nproc --all) / 2))' >> ld-wrapper
+          echo 'ld.lld "$@" --thinlto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --thinlto-jobs=$(($(nproc --all) / 2))' >> ld-wrapper
           chmod +x ld-wrapper
 
-          # 1. Παραγωγή gki_defconfig με Clang 21 strictness bypass flags
+          wget https://github.com/$GITHUB_REPOSITORY/raw/refs/heads/$GITHUB_REF_NAME/lib/libfakestat.so || true
+          wget https://github.com/$GITHUB_REPOSITORY/raw/refs/heads/$GITHUB_REF_NAME/lib/libfaketimeMT.so || true
+          chmod 777 ./*.so || true
+          SO_DIR=$(pwd)
+          export FAKESTAT="2025-05-25 12:00:00"
+          export FAKETIME="@2025-05-25 13:00:00"
+          export PRELOAD_LIBS="$SO_DIR/libfakestat.so $SO_DIR/libfaketimeMT.so"
+
+          # 1. Παραγωγή gki_defconfig χρησιμοποιώντας CodeLinaro εργαλεία
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
             CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD="$(pwd)/ld-wrapper" \
             O=$GITHUB_WORKSPACE/kout \
-            KCFLAGS="-O2 -pipe -Wno-error -Wno-initializer-overrides -Wno-enum-conversion -Wno-implicit-function-declaration -Wno-implicit-int -Wno-format -Wno-unknown-warning-option" \
+            KCFLAGS="-O2 -pipe -Wno-error -Wno-implicit-function-declaration -Wno-implicit-int -Wno-default-const-init-var-unsafe -Wno-format -Wno-unknown-warning-option" \
             gki_defconfig
 
-          # 2. Μεταγλώττιση καθαρού GKI Image
+          # 2. Μεταγλώττιση του Vendor Image για το Garnet hardware
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
             CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD="$(pwd)/ld-wrapper" \
             O=$GITHUB_WORKSPACE/kout \
-            KCFLAGS="-O2 -pipe -Wno-error -Wno-initializer-overrides -Wno-enum-conversion -Wno-implicit-function-declaration -Wno-implicit-int -Wno-format -Wno-unknown-warning-option ${MAP}" \
+            KCFLAGS="-O2 -pipe -Wno-error -Wno-implicit-function-declaration -Wno-implicit-int -Wno-default-const-init-var-unsafe -Wno-format -Wno-unknown-warning-option ${MAP}" \
             Image
 
           echo "Kernel Compilation Complete!"
@@ -365,7 +311,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: ccache-neov4-5.10.236-${{ runner.os }}-${{ github.ref_name }}-${{ github.run_id }}
+          key: ccache-garnet-5.10-${{ runner.os }}-${{ github.ref_name }}-${{ github.run_id }}
 
       - name: 📦 Save LTO CCache
         if: success() && inputs.lto_type == 'thin'
@@ -386,9 +332,8 @@ jobs:
             echo "Kernel Image not found, build may have failed."
             exit 1
           fi
-          AK3_NAME=AnyKernel3_AOSP_5.10.236_palaziks_AOSP-ShiftPorts.zip
-          FULL_VERSION=5.10.236-palaziks_AOSP-ShiftPorts
-          #zip -r ../$AK3_NAME ./*
+          AK3_NAME=AnyKernel3_AOSP_5.10_Garnet_palaziks_AOSP-ShiftPorts.zip
+          FULL_VERSION=5.10-Garnet-palaziks_AOSP-ShiftPorts
           echo "ak3name=$AK3_NAME" >> $GITHUB_OUTPUT
           
           TIME_NOW="$(TZ='Europe/Athens' date +'%Y-%m-%d %H:%M:%S')"
@@ -399,7 +344,6 @@ jobs:
           echo "Commit: $GITHUB_SHA" >> ./ak3.log
           echo "Time: $TIME_NOW" >> ./ak3.log
           echo "Kernel Ver: $FULL_VERSION" >> ./ak3.log
-          #zip -z ../$AK3_NAME < ./ak3.log
 
       - name: 📤 Upload AnyKernel3
         uses: actions/upload-artifact@v4
