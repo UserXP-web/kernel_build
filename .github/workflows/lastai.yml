@@ -33,6 +33,16 @@ jobs:
           rm -rf out .config
           make ARCH=arm64 mrproper
           
+          # Ρυθμίσεις "Έξω από το Κουτί" για ενσωμάτωση drivers (Όπως το FleurX)
+          echo "CONFIG_IKCONFIG=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IKCONFIG_PROC=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_FRAME_WARN=2048" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_DEVTMPFS=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_DEVTMPFS_MOUNT=y" >> arch/arm64/configs/gki_defconfig
+          
+          # Απενεργοποίηση εξωτερικών modules για να "ραφτούν" οι drivers στο Image
+          echo "# CONFIG_MODULES is not set" >> arch/arm64/configs/gki_defconfig
+          
           # Δικαιώματα εκτέλεσης στα binaries του Clang
           chmod -R +x ../clang/
           
