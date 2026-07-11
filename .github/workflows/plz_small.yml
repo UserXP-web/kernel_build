@@ -262,10 +262,15 @@ jobs:
 
       - name: 📦 Add build name
         run: |
-          cd kernel_workspace
-          sudo sed -i "s/-4k/-palaziks-ShiftPorts/g" ./common/arch/arm64/configs/gki_defconfig
-          sed -i 's/${scm_version}//' ./common/scripts/setlocalversion
-          echo "CONFIG_LOCALVERSION_AUTO=n" >> ./common/arch/arm64/configs/gki_defconfig
+          cd common
+          if [ -f "scripts/setlocalversion" ]; then
+            sed -i 's/${scm_version}//' scripts/setlocalversion
+          fi          
+          # Εφαρμογή του custom ονόματος απευθείας στο ήδη συγχωνευμένο .config
+          if [ -f "../out/.config" ]; then
+            echo 'CONFIG_LOCALVERSION="-palaziks-ShiftPorts"' >> ../out/.config
+            echo "CONFIG_LOCALVERSION_AUTO=n" >> ../out/.config
+          fi
 
       - name: 🔨 Build Kernel
         run: |
