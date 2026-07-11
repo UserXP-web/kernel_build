@@ -1,4 +1,4 @@
-name: 🚀 Valid Garnet Kernel
+name: ~Valid Garnet Kernel
 
 on:
   workflow_dispatch:
