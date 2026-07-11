@@ -112,10 +112,15 @@ jobs:
           wait
 
           echo "Removing ABI protection & dirty suffix..."
-          rm common/android/abi_gki_protected_exports_* || true
+          # Διόρθωση μονοπατιών για Vendor Kernel
+          rm common/abi_gki_protected_exports_* 2>/dev/null || true
+          rm common/android/abi_gki_protected_exports_* 2>/dev/null || true
+          
           for f in common/scripts/setlocalversion; do
-            sed -i 's/ -dirty//g' "$f"
-            sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' "$f"
+            if [ -f "$f" ]; then
+              sed -i 's/ -dirty//g' "$f"
+              sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' "$f"
+            fi
           done
 
           echo "Source and tools initialized successfully!"
@@ -235,6 +240,9 @@ jobs:
           echo "CONFIG_MODULES=y"                        >> "$DEFCONFIG"
           echo "CONFIG_IKCONFIG=y"                       >> "$DEFCONFIG"
           echo "CONFIG_IKCONFIG_PROC=y"                  >> "$DEFCONFIG"
+
+          #echo "CONFIG_LLVM_POLLY=y"                    >> "$DEFCONFIG"
+          #echo "CONFIG_LD_DEAD_CODE_DATA_ELIMINATION=y" >> "$DEFCONFIG"
 
       - name: Configure LTO
         run: |
