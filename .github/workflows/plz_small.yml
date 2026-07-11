@@ -231,20 +231,20 @@ jobs:
 
       - name: 🧩 Merge and Configure Defconfigs
         run: |
-          cd kernel_workspace/common
+          # Μπαίνουμε στον πραγματικό φάκελο που έγινε το git clone
+          cd common
           
-          # 1. Εισαγωγή ρυθμίσεων "built-in drivers" και Polly απευθείας στο gki_defconfig πριν το merge
+          # 1. Εισαγωγή ρυθμίσεων απευθείας στο gki_defconfig πριν το merge
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_HEADERS_INSTALL=n"               >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_MODULES=y"                        >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_IKCONFIG=y"                       >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_IKCONFIG_PROC=y"                  >> arch/arm64/configs/gki_defconfig
           
-          # Ενεργοποίηση POLLY και Garbage Collection (Αφού το δέντρο της Evolution-X τα υποστηρίζει)
           echo "CONFIG_LLVM_POLLY=y"                    >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_LD_DEAD_CODE_DATA_ELIMINATION=y" >> arch/arm64/configs/gki_defconfig
 
-          # 2. Ρύθμιση του LTO ανάλογα με το input του workflow
+          # 2. Ρύθμιση του LTO
           if [[ "${{ github.event.inputs.lto_type }}" == "none" ]]; then
             echo "CONFIG_LTO_CLANG_NONE=y" >> arch/arm64/configs/gki_defconfig
           elif [[ "${{ github.event.inputs.lto_type }}" == "full" ]]; then
@@ -253,7 +253,7 @@ jobs:
             echo "CONFIG_LTO_CLANG_THIN=y" >> arch/arm64/configs/gki_defconfig
           fi
 
-          # 3. Εκτέλεση του επίσημου scripts της Qualcomm/Google για το Merge των Defconfigs
+          # 3. Εκτέλεση του Merge των Defconfigs
           mkdir -p ../out
           ARCH=arm64 ./scripts/kconfig/merge_config.sh \
             -O ../out \
@@ -271,33 +271,35 @@ jobs:
         run: |
           WORKDIR="$(pwd)"
           export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
+          
+          # Διόρθωση των paths για τον Clang και τα build-tools που είναι στη ρίζα
           export PATH="$WORKDIR/kernel_workspace/clang-r563880c/bin:$WORKDIR/kernel_workspace/build-tools/linux-x86/bin:$PATH"
           CLANG_DIR="$WORKDIR/kernel_workspace/clang-r563880c/bin"
           
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
-          export CCACHE_LOGFILE="${{ github.workspace }}/kernel_workspace/ccache.log"
+          export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
           export CCACHE_IS_KERNEL_COMPILING=true
 
           mkdir -p $GITHUB_WORKSPACE/kout
           mkdir -p $GITHUB_WORKSPACE/ldcache_garnet
 
-          # Αντιγραφή του ήδη συγχωνευμένου .config στον φάκελο εξόδου kout
-          cp $WORKDIR/kernel_workspace/out/.config $GITHUB_WORKSPACE/kout/.config
+          # Αντιγραφή του συγχωνευμένου .config στον φάκελο εξόδου kout
+          cp $WORKDIR/out/.config $GITHUB_WORKSPACE/kout/.config
 
-          cd kernel_workspace/common
+          cd common
 
           echo '#!/bin/bash' > ld-wrapper
           echo 'ld.lld "$@" --thinlto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --thinlto-jobs=$(($(nproc --all) / 2))' >> ld-wrapper
           chmod +x ld-wrapper
 
-          # 1. Εκτέλεση olddefconfig πάνω στο συγχωνευμένο αρχείο για να κλειδώσουν οι drivers
+          # 1. Εκτέλεση olddefconfig
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
             CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD="$(pwd)/ld-wrapper" \
             O=$GITHUB_WORKSPACE/kout \
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
             olddefconfig
 
-          # 2. Μεταγλώττιση του τελικού Image
+          # 2. Μεταγλώττιση του Image
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
             CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD="$(pwd)/ld-wrapper" \
             O=$GITHUB_WORKSPACE/kout \
