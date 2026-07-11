@@ -237,7 +237,14 @@ jobs:
 
       - name: 🧩 Merge and Configure Defconfigs
         run: |
-          cd kernel_workspace/common
+          echo "=== ΕΛΕΓΧΟΣ ΥΠΑΡΧΟΝΤΩΝ ΦΑΚΕΛΩΝ ==="
+          pwd
+          ls -la
+          find . -maxdepth 3 -type d
+          echo "=================================="
+          
+          # Δοκιμή εισόδου με πλήρες μονοπάτι
+          cd $GITHUB_WORKSPACE/kernel_workspace/common || cd common || cd kernel_workspace
           
           # 1. Εισαγωγή ρυθμίσεων απευθείας στο gki_defconfig πριν το merge
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> arch/arm64/configs/gki_defconfig
