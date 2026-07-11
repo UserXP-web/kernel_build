@@ -33,15 +33,17 @@ jobs:
           rm -rf out .config
           make ARCH=arm64 mrproper
           
-          # Ρυθμίσεις "Έξω από το Κουτί" (Δοκιμή 1249)
+          # Ρυθμίσεις για τη διόρθωση του Bootloop (Δοκιμή 1250)
           echo "CONFIG_IKCONFIG=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_IKCONFIG_PROC=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_FRAME_WARN=2048" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_DEVTMPFS=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_DEVTMPFS_MOUNT=y" >> arch/arm64/configs/gki_defconfig
           
-          # Επαναφορά modules και απενεργοποίηση του ελαττωματικού debug driver
+          # Διαχείριση Modules για AOSP ROMs
           echo "CONFIG_MODULES=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_MODVERSIONS=y" >> arch/arm64/configs/gki_defconfig
+          echo "# CONFIG_MODULE_SIG is not set" >> arch/arm64/configs/gki_defconfig
           echo "# CONFIG_ANDROID_DEBUG_KINFO is not set" >> arch/arm64/configs/gki_defconfig
           
           # Δικαιώματα εκτέλεσης στα binaries του Clang
