@@ -81,7 +81,7 @@ jobs:
 
           # Λήψη του Vendor Κώδικα της Evolution-X στον σωστό φάκελο
           echo "Cloning source repository..."
-          git clone --depth=1 https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet -b uqpr2 kernel_workspace/common &
+          git clone --depth=1 https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet -b vic kernel_workspace/common & || { echo "❌ ERROR: Git clone failed!"; exit 1; }
           #git clone --depth=1 "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet" -b Zen-Itsu-Garnet kernel_workspace/common &
 
           #echo "🌐 Initialize kernel repository..."
@@ -237,14 +237,7 @@ jobs:
 
       - name: 🧩 Merge and Configure Defconfigs
         run: |
-          echo "=== ΕΛΕΓΧΟΣ ΥΠΑΡΧΟΝΤΩΝ ΦΑΚΕΛΩΝ ==="
-          pwd
-          ls -la
-          find . -maxdepth 3 -type d
-          echo "=================================="
-          
-          # Δοκιμή εισόδου με πλήρες μονοπάτι
-          cd $GITHUB_WORKSPACE/kernel_workspace/common || cd common || cd kernel_workspace
+          cd kernel_workspace/common
           
           # 1. Εισαγωγή ρυθμίσεων απευθείας στο gki_defconfig πριν το merge
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> arch/arm64/configs/gki_defconfig
