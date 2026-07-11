@@ -5,7 +5,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  TZ: Asia/Shanghai
+  TZ: Europe/Athens
   ANDROID_VERSION: 'android12'
   KERNEL_VERSION: '5.10'
   KERNEL_NAME: 'android12-5.10.236-abogki'
@@ -266,7 +266,8 @@ jobs:
           sed -i 's/${scm_version}//' ./common/scripts/setlocalversion
           echo "CONFIG_LOCALVERSION_AUTO=n" >> ./common/arch/arm64/configs/gki_defconfig
 
-      - name: 🔨 Build Kernel
+      - name: 🔨 Build Kernel (OLD)
+        if: false
         run: |
           WORKDIR="$(pwd)"
           export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
@@ -307,6 +308,58 @@ jobs:
             CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD="$(pwd)/ld-wrapper" \
             O=$GITHUB_WORKSPACE/kout \
             KCFLAGS="-O2 -pipe -Wno-error -Wno-implicit-function-declaration -Wno-implicit-int -Wno-default-const-init-var-unsafe -Wno-format -Wno-unknown-warning-option ${EXTRA_CFLAGS:-} ${MAP}" \
+            Image
+
+          echo "Kernel Compilation Complete!"
+          ccache -c
+          ccache --evict-older-than 10800s
+          echo "CCache Status:"
+          ccache -s
+          df -h
+
+      - name: 🔨 Build Kernel
+        run: |
+          WORKDIR="$(pwd)"
+          export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
+          export PATH="$WORKDIR/kernel_workspace/clang-r563880c/bin:$WORKDIR/kernel_workspace/build-tools/linux-x86/bin:$PATH"
+          CLANG_DIR="$WORKDIR/kernel_workspace/clang-r563880c/bin"
+          echo "Clang: $($CLANG_DIR/clang --version | head -n 1)"
+          echo "LLD:   $($CLANG_DIR/ld.lld --version | head -n 1)"
+          pahole --version 2>/dev/null || echo "Pahole: Not Installed"
+
+          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
+          export CCACHE_LOGFILE="${{ github.workspace }}/kernel_workspace/ccache.log"
+          export CCACHE_IS_KERNEL_COMPILING=true
+
+          mkdir -p $GITHUB_WORKSPACE/kout
+          mkdir -p $GITHUB_WORKSPACE/ldcache_5.10.236
+
+          cd kernel_workspace/common
+
+          echo '#!/bin/bash' > ld-wrapper
+          echo 'ld.lld "$@" --thinlto-cache-dir=$GITHUB_WORKSPACE/ldcache_5.10.236 --thinlto-jobs=$(($(nproc --all) / 2))' >> ld-wrapper
+          chmod +x ld-wrapper
+
+          wget https://github.com/$GITHUB_REPOSITORY/raw/refs/heads/$GITHUB_REF_NAME/lib/libfakestat.so || true
+          wget https://github.com/$GITHUB_REPOSITORY/raw/refs/heads/$GITHUB_REF_NAME/lib/libfaketimeMT.so || true
+          chmod 777 ./*.so || true
+          SO_DIR=$(pwd)
+          export FAKESTAT="2025-05-25 12:00:00"
+          export FAKETIME="@2025-05-25 13:00:00"
+          export PRELOAD_LIBS="$SO_DIR/libfakestat.so $SO_DIR/libfaketimeMT.so"
+
+          # 1. Παραγωγή gki_defconfig με Clang 21 strictness bypass flags
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+            CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD="$(pwd)/ld-wrapper" \
+            O=$GITHUB_WORKSPACE/kout \
+            KCFLAGS="-O2 -pipe -Wno-error -Wno-initializer-overrides -Wno-enum-conversion -Wno-implicit-function-declaration -Wno-implicit-int -Wno-format -Wno-unknown-warning-option" \
+            gki_defconfig
+
+          # 2. Μεταγλώττιση καθαρού GKI Image για Android 16 συμβατότητα
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+            CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD="$(pwd)/ld-wrapper" \
+            O=$GITHUB_WORKSPACE/kout \
+            KCFLAGS="-O2 -pipe -Wno-error -Wno-initializer-overrides -Wno-enum-conversion -Wno-implicit-function-declaration -Wno-implicit-int -Wno-format -Wno-unknown-warning-option ${MAP}" \
             Image
 
           echo "Kernel Compilation Complete!"
