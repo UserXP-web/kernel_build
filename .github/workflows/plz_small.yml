@@ -81,7 +81,7 @@ jobs:
 
           # Λήψη του Vendor Κώδικα της Evolution-X στον σωστό φάκελο
           echo "Cloning source repository..."
-          git clone --depth=1 https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet -b vic kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
+          git clone --depth=1 https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet -b bka kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
           #git clone --depth=1 "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet" -b Zen-Itsu-Garnet kernel_workspace/common
 
           #echo "🌐 Initialize kernel repository..."
