@@ -66,9 +66,10 @@ jobs:
           CLANG_PATH=$(realpath ../clang/bin)
           export PATH="$CLANG_PATH:$PATH"
           
-          # 1. Ενεργοποιούμε το Full LTO απευθείας στο config
-          sed -i 's/CONFIG_LTO_CLANG_THIN=y/# CONFIG_LTO_CLANG_THIN is not set/g' out/.config
-          echo "CONFIG_LTO_CLANG_FULL=y" >> out/.config
+          # ΑΛΛΑΓΗ: Ενεργοποιούμε το Thin LTO αντί για το Full LTO που προκαλεί το instant reset
+          sed -i 's/CONFIG_LTO_CLANG_FULL=y/# CONFIG_LTO_CLANG_FULL is not set/g' out/.config
+          echo "CONFIG_LTO_CLANG_THIN=y" >> out/.config
+          echo "CONFIG_ARM64_LSE_ATOMICS=y" >> out/.config
           
           # 2. Εκτέλεση olddefconfig
           make -j$(nproc --all) \
