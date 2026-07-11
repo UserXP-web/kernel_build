@@ -339,14 +339,6 @@ jobs:
           echo 'ld.lld "$@" --thinlto-cache-dir=$GITHUB_WORKSPACE/ldcache_5.10.236 --thinlto-jobs=$(($(nproc --all) / 2))' >> ld-wrapper
           chmod +x ld-wrapper
 
-          wget https://github.com/$GITHUB_REPOSITORY/raw/refs/heads/$GITHUB_REF_NAME/lib/libfakestat.so || true
-          wget https://github.com/$GITHUB_REPOSITORY/raw/refs/heads/$GITHUB_REF_NAME/lib/libfaketimeMT.so || true
-          chmod 777 ./*.so || true
-          SO_DIR=$(pwd)
-          export FAKESTAT="2025-05-25 12:00:00"
-          export FAKETIME="@2025-05-25 13:00:00"
-          export PRELOAD_LIBS="$SO_DIR/libfakestat.so $SO_DIR/libfaketimeMT.so"
-
           # 1. Παραγωγή gki_defconfig με Clang 21 strictness bypass flags
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
             CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD="$(pwd)/ld-wrapper" \
@@ -354,7 +346,7 @@ jobs:
             KCFLAGS="-O2 -pipe -Wno-error -Wno-initializer-overrides -Wno-enum-conversion -Wno-implicit-function-declaration -Wno-implicit-int -Wno-format -Wno-unknown-warning-option" \
             gki_defconfig
 
-          # 2. Μεταγλώττιση καθαρού GKI Image για Android 16 συμβατότητα
+          # 2. Μεταγλώττιση καθαρού GKI Image
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
             CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD="$(pwd)/ld-wrapper" \
             O=$GITHUB_WORKSPACE/kout \
