@@ -87,10 +87,10 @@ jobs:
           tar -xzf common.tar.gz -C common &&
           rm -f common.tar.gz &
 
-          echo "<> Clone source..."
-          mkdir -p ./common # android/common
-          #git clone --depth=1 -b bka "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet" ./common
-          git clone --depth=1 "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet" -b Zen-Itsu-Garnet ./common
+          #echo "<> Clone source..."
+          #mkdir -p ./common # android/common
+          ##git clone --depth=1 -b bka "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet" ./common
+          #git clone --depth=1 "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet" -b Zen-Itsu-Garnet ./common
 
           #echo "🌐 Initialize kernel repository..."
           ##mkdir -p android && cd android          
@@ -102,7 +102,7 @@ jobs:
           #echo "🔄 Synchronize the codebase (using $(nproc --all) threads)..."
           #repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle --force-sync
           #echo "✅ Kernel source code cloning complete"
-
+          
 
           if [ "${{ steps.clang-cache.outputs.cache-hit }}" != "true" ]; then
             echo "Cache miss — downloading clang-r563880c..."
@@ -245,7 +245,6 @@ jobs:
           DEFCONFIG="./common/arch/arm64/configs/gki_defconfig"
       
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$DEFCONFIG"
-          sed -i 's/check_defconfig//' ./common/build.config.gki
           echo "CONFIG_HEADERS_INSTALL=n"               >> "$DEFCONFIG"
 
       - name: Configure LTO
@@ -400,7 +399,7 @@ jobs:
           #zip -r ../$AK3_NAME ./*
           echo "ak3name=$AK3_NAME" >> $GITHUB_OUTPUT
           
-          TIME_NOW="$(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S')"
+          TIME_NOW="$(TZ='Europe/Athens' date +'%Y-%m-%d %H:%M:%S')"
           echo "Author: $GITHUB_ACTOR" > ./ak3.log
           echo "Repo: $GITHUB_REPOSITORY" >> ./ak3.log
           echo "Branch: $GITHUB_REF_NAME" >> ./ak3.log
