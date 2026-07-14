@@ -110,7 +110,7 @@ jobs:
           if [ "${{ steps.buildtools-cache.outputs.cache-hit }}" != "true" ]; then
             echo "Cache miss — cloning build-tools..."
             git clone --depth=1 -b ks-kernel.lnx.4.0.r1-rel \
-              [DOMAIN_REMOVED]/clo/la/kernel/prebuilts/build-tools.git kernel_workspace/build-tools
+               https://git.codelinaro.org/clo/la/kernel/prebuilts/build-tools.git kernel_workspace/build-tools
           else
             echo "build-tools restored from cache, skipping clone."
           fi &
@@ -297,7 +297,8 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/ldcache_garnet
 
           # Αντιγραφή του συγχωνευμένου .config στον τελικό φάκελο εξόδου kout
-          cp $WORKDIR/kernel_workspace/out/.config $GITHUB_WORKSPACE/kout/.config
+          #cp $WORKDIR/kernel_workspace/out/.config $GITHUB_WORKSPACE/kout/.config
+          curl -L "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_axion_a16" -o $GITHUB_WORKSPACE/kout/.config
 
           cd kernel_workspace/common
 
