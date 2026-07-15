@@ -236,6 +236,7 @@ jobs:
           find "${{ env.CCACHE_DIR }}" -type f -exec touch -t $(date -d "1 day ago" +%Y%m%d%H%M) {} + || true
 
       - name: 🧩 Merge and Configure Defconfigs
+        if: false
         run: |
           cd kernel_workspace/common
           
@@ -283,20 +284,78 @@ jobs:
             arch/arm64/configs/gki_defconfig \
             arch/arm64/configs/vendor/garnet_GKI.config
 
+      - name: 🧩 Setup FleurX Config Base
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/kout
+          mkdir -p $GITHUB_WORKSPACE/ldcache_garnet
+          
+          # [ΔΙΟΡΘΩΜΕΝΟ PATH]: Αντιγραφή με χρήση της καθολικής μεταβλητής του workspace
+          if [ -f "$GITHUB_WORKSPACE/configs/config_from_fleurx" ]; then
+            #https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_fleurx
+            cp $GITHUB_WORKSPACE/configs/config_from_fleurx $GITHUB_WORKSPACE/kout/.config
+            echo "✅ FleurX config found and copied successfully!"
+          else
+            echo "❌ ERROR: config_from_fleurx not found at $GITHUB_WORKSPACE/configs/"
+            exit 1
+          fi
+
       - name: 📦 Add build name
         run: |
           cd kernel_workspace/common
           
+          # Αφαίρεση του scm_version για καθαρό compilation
           if [ -f "scripts/setlocalversion" ]; then
             sed -i 's/${scm_version}//' scripts/setlocalversion
           fi
           
-          if [ -f "../out/.config" ]; then
-            echo 'CONFIG_LOCALVERSION="-palaziks-ShiftPorts"' >> ../out/.config
-            echo "CONFIG_LOCALVERSION_AUTO=n" >> ../out/.config
+          # Εφαρμογή του custom ονόματος στο τελικό .config
+          if [ -f "$GITHUB_WORKSPACE/kout/.config" ]; then
+            sed -i '/CONFIG_LOCALVERSION=/d' $GITHUB_WORKSPACE/kout/.config
+            sed -i '/CONFIG_LOCALVERSION_AUTO=/d' $GITHUB_WORKSPACE/kout/.config
+            echo 'CONFIG_LOCALVERSION="-palaziks-ShiftPorts"' >> $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_LOCALVERSION_AUTO=n" >> $GITHUB_WORKSPACE/kout/.config
           fi
 
       - name: 🔨 Build Kernel
+        run: |
+          WORKDIR="$(pwd)"
+          export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
+          
+          export PATH="$WORKDIR/kernel_workspace/clang-r563880c/bin:$WORKDIR/kernel_workspace/build-tools/linux-x86/bin:$PATH"
+          
+          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
+          export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
+          export CCACHE_IS_KERNEL_COMPILING=true
+
+          cd kernel_workspace/common
+
+          echo '#!/bin/bash' > ld-wrapper
+          echo 'ld.lld "$@" --thinlto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --thinlto-jobs=$(($(nproc --all) / 2))' >> ld-wrapper
+          chmod +x ld-wrapper
+
+          # 1. Εκτέλεση olddefconfig για να ευθυγραμμιστεί το FleurX config με τον κώδικα (Crdroid ή EvoX)
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+            CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD="$(pwd)/ld-wrapper" \
+            O=$GITHUB_WORKSPACE/kout \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            olddefconfig
+
+          # 2. Μεταγλώττιση του Image
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+            CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD="$(pwd)/ld-wrapper" \
+            O=$GITHUB_WORKSPACE/kout \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            KCFLAGS="-O2 -pipe -Wno-error -Wno-implicit-function-declaration -Wno-implicit-int -Wno-default-const-init-var-unsafe -Wno-format -Wno-unknown-warning-option ${MAP}" \
+            Image
+
+          echo "Kernel Compilation Complete!"
+          ccache -c
+          ccache --evict-older-than 10800s
+          ccache -s
+          df -h
+
+      - name: 🔨 Build Kernel (old)
+        if: false
         run: |
           WORKDIR="$(pwd)"
           export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
