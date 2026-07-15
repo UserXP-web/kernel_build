@@ -288,15 +288,13 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/kout
           mkdir -p $GITHUB_WORKSPACE/ldcache_garnet
           
-          # [ΤΟ ΜΥΣΤΙΚΟ]: Κατεβάζουμε το έγκυρο config απευθείας από το raw URL του GitHub σου
           echo "Downloading config_from_fleurx..."
           curl -L "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_fleurx" -o $GITHUB_WORKSPACE/kout/.config
 
-          # Έλεγχος αν το αρχείο κατέβηκε επιτυχώς και δεν είναι άδειο
           if [ -s "$GITHUB_WORKSPACE/kout/.config" ]; then
             echo "✅ FleurX config downloaded successfully!"
           else
-            echo "❌ ERROR: Failed to download config_from_fleurx or file is empty!"
+            echo "❌ ERROR: Failed to download config_from_fleurx!"
             exit 1
           fi
 
@@ -342,12 +340,11 @@ jobs:
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
             olddefconfig
 
-          # 2. Μεταγλώττιση του Image
+          # 2. Μεταγλώττιση του Image (Καθαρό χτίσιμο χωρίς επιθετικά KCFLAGS)
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
             CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD="$(pwd)/ld-wrapper" \
             O=$GITHUB_WORKSPACE/kout \
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
-            KCFLAGS="-O2 -pipe -Wno-error -Wno-implicit-function-declaration -Wno-implicit-int -Wno-default-const-init-var-unsafe -Wno-format -Wno-unknown-warning-option ${MAP}" \
             Image
 
           echo "Kernel Compilation Complete!"
