@@ -116,7 +116,7 @@ jobs:
           echo "🔄 Synchronize the codebase (using $(nproc --all) threads)..."
           repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle --force-sync
           echo "✅ Kernel source code cloning complete"
-
+          cd $GITHUB_WORKSPACE
 
           echo "Removing ABI protection & dirty suffix..."
           rm kernel_workspace/common/abi_gki_protected_exports_* 2>/dev/null || true
