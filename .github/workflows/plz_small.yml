@@ -105,18 +105,19 @@ jobs:
           #git clone --depth=1 https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet -b bka kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
           #git clone --depth=1 "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet" -b Zen-Itsu-Garnet kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
           #git clone --depth=1 https://github.com/crdroidandroid/android_xiaomi_kernel_garnet -b 16.0 kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
-          echo "🌐 Initialize kernel repository..."
-          #mkdir -p android && cd android
-          mkdir -p kernel_workspace && cd kernel_workspace
-          MANIFEST_URL="https://github.com/UserXP-web/kernel_build" # ${{ env.manifest_url }}
-          MANIFEST_BRANCH="main" # ${{ env.manifest_branch }}
-          MANIFEST_XML="manifest/zylhdrXP.xml" # manifest/${{ inputs.MANIFEST_selection }}.xml
-          echo "~ $MANIFEST_URL ^^^ $MANIFEST_BRANCH --- $MANIFEST_XML"        
-          repo init --depth=1 -u $MANIFEST_URL -b $MANIFEST_BRANCH -m $MANIFEST_XML
-          echo "🔄 Synchronize the codebase (using $(nproc --all) threads)..."
-          repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle --force-sync
-          echo "✅ Kernel source code cloning complete"
-          cd $GITHUB_WORKSPACE
+          git clone --depth=1 https://github.com/zylhdrXP/android_kernel_xiaomi_sm7435 -b lineage-23.2 kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
+          #echo "🌐 Initialize kernel repository..."
+          3#mkdir -p android && cd android
+          #mkdir -p kernel_workspace && cd kernel_workspace
+          #MANIFEST_URL="https://github.com/UserXP-web/kernel_build" # ${{ env.manifest_url }}
+          #MANIFEST_BRANCH="main" # ${{ env.manifest_branch }}
+          #MANIFEST_XML="manifest/zylhdrXP.xml" # manifest/${{ inputs.MANIFEST_selection }}.xml
+          #echo "~ $MANIFEST_URL ^^^ $MANIFEST_BRANCH --- $MANIFEST_XML"        
+          #repo init --depth=1 -u $MANIFEST_URL -b $MANIFEST_BRANCH -m $MANIFEST_XML
+          #echo "🔄 Synchronize the codebase (using $(nproc --all) threads)..."
+          #repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle --force-sync
+          #echo "✅ Kernel source code cloning complete"
+          #cd $GITHUB_WORKSPACE
 
           echo "Removing ABI protection & dirty suffix..."
           rm kernel_workspace/common/abi_gki_protected_exports_* 2>/dev/null || true
