@@ -315,27 +315,36 @@ jobs:
             echo 'CONFIG_LOCALVERSION="-palaziks-ShiftPorts"' >> $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_LOCALVERSION_AUTO=n" >> $GITHUB_WORKSPACE/kout/.config
 
-            # 1. [Η ΑΠΟΛΥΤΗ ΛΥΣΗ ΓΙΑ ΤΟ qcom_glink_is_wakeup ERROR]
-            # Ενεργοποίηση του κεντρικού RPMSG Framework (Υποχρεωτικό dependency)
+            # 1. [ΕΠΙΘΕΤΙΚΟ FIX ΓΙΑ qcom_glink_is_wakeup & DEPENDENCIES]
             sed -i '/CONFIG_RPMSG=/d' $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_RPMSG=y" >> $GITHUB_WORKSPACE/kout/.config
             
             sed -i '/CONFIG_RPMSG_CHAR=/d' $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_RPMSG_CHAR=y" >> $GITHUB_WORKSPACE/kout/.config
 
-            # Επιβολή του Qualcomm GLINK Core στατικά
             sed -i '/CONFIG_RPMSG_QCOM_GLINK=/d' $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_RPMSG_QCOM_GLINK=y" >> $GITHUB_WORKSPACE/kout/.config
 
             sed -i '/CONFIG_RPMSG_QCOM_GLINK_SMD=/d' $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_RPMSG_QCOM_GLINK_SMD=y" >> $GITHUB_WORKSPACE/kout/.config
 
-            # Ενεργοποίηση του Qualcomm SMD (Shared Memory Driver) Core
             sed -i '/CONFIG_QCOM_SMD=/d' $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_QCOM_SMD=y" >> $GITHUB_WORKSPACE/kout/.config
 
-            # 2. [ΤΟ ΜΥΣΤΙΚΟ ΦΙΞ ΓΙΑ ΤΟ QMI / FIRMWARE CHANNEL]
-            # Ενεργοποίηση του Qualcomm IPC Router (Απαραίτητο για WLAN & Display HALs)
+            # Ενεργοποίηση των Xiaomi/Qcom Power Drivers που περιέχουν το Glink Wakeup
+            sed -i '/CONFIG_QCOM_AOSS_TCS=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_QCOM_AOSS_TCS=y" >> $GITHUB_WORKSPACE/kout/.config
+
+            sed -i '/CONFIG_QCOM_COMMAND_DB=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_QCOM_COMMAND_DB=y" >> $GITHUB_WORKSPACE/kout/.config
+
+            sed -i '/CONFIG_QCOM_RPMH=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_QCOM_RPMH=y" >> $GITHUB_WORKSPACE/kout/.config
+
+            sed -i '/CONFIG_QCOM_RPMHPD=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_QCOM_RPMHPD=y" >> $GITHUB_WORKSPACE/kout/.config
+
+            # 2. [ΦΙΞ ΓΙΑ ΤΟ QMI / FIRMWARE CHANNEL]
             sed -i '/CONFIG_QRTR=/d' $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_QRTR=y" >> $GITHUB_WORKSPACE/kout/.config
             
@@ -345,11 +354,10 @@ jobs:
             sed -i '/CONFIG_QRTR_MHI=/d' $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_QRTR_MHI=y" >> $GITHUB_WORKSPACE/kout/.config
 
-            # Εξασφάλιση Qualcomm Peripheral Image Loader (PIL) για το Display Firmware
             sed -i '/CONFIG_QCOM_PIL=/d' $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_QCOM_PIL=y" >> $GITHUB_WORKSPACE/kout/.config
 
-            # 3. [ΤΟ ΦΙΞ ΓΙΑ ΤΟ DISPLAY COMPOSER CRASH (SIGSEGV)]
+            # 3. [ΦΙΞ ΓΙΑ ΤΟ DISPLAY COMPOSER CRASH (SIGSEGV)]
             sed -i '/CONFIG_QCOM_PMIC_GLINK=/d' $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_QCOM_PMIC_GLINK=y" >> $GITHUB_WORKSPACE/kout/.config
 
@@ -358,11 +366,7 @@ jobs:
 
             sed -i '/CONFIG_DRM_MSM=/d' $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_DRM_MSM=y" >> $GITHUB_WORKSPACE/kout/.config
-            
-            sed -i '/CONFIG_DRM_MSM_REGISTER_LOGGING=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "# CONFIG_DRM_MSM_REGISTER_LOGGING is not set" >> $GITHUB_WORKSPACE/kout/.config
 
-            # Κλείσιμο του Data Corruption Panic
             sed -i '/CONFIG_PANIC_ON_DATA_CORRUPTION=/d' $GITHUB_WORKSPACE/kout/.config
             echo "# CONFIG_PANIC_ON_DATA_CORRUPTION is not set" >> $GITHUB_WORKSPACE/kout/.config
           fi
@@ -383,7 +387,7 @@ jobs:
 
           # Ρύθμιση του ld-wrapper για το LTO
           echo '#!/bin/bash' > ld-wrapper
-          echo 'ld.lld "$@" --thinlto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --thinlto-jobs=2' >> ld-wrapper
+          echo 'ld.lld "$@" --thinlto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --thinlto-jobs=2 --allow-shlib-undefined' >> ld-wrapper
           chmod +x ld-wrapper
 
           # [ΕΞΑΣΦΑΛΙΣΗ CLANG 21]: Ορίζουμε ρητά τις μεταβλητές για LLVM εργαλεία
