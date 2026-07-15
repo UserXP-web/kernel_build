@@ -315,23 +315,28 @@ jobs:
             echo 'CONFIG_LOCALVERSION="-palaziks-ShiftPorts"' >> $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_LOCALVERSION_AUTO=n" >> $GITHUB_WORKSPACE/kout/.config
 
-            # [ΤΟ ΑΠΟΛΥΤΟ ΦΙΞ ΓΙΑ ΤΟ DISPLAY COMPOSER CRASH]
-            # Εξασφάλιση ότι ο PMIC GLINK driver είναι σταθερός
+            # [ΤΟ ΜΥΣΤΙΚΟ ΦΙΞ ΓΙΑ ΤΟ QMI / FIRMWARE CHANNEL]
+            # Ενεργοποίηση του Qualcomm IPC Router (Απαραίτητο για WLAN & Display HALs)
+            sed -i '/CONFIG_QRTR=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_QRTR=y" >> $GITHUB_WORKSPACE/kout/.config
+            
+            sed -i '/CONFIG_QRTR_SMD=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_QRTR_SMD=y" >> $GITHUB_WORKSPACE/kout/.config
+
+            sed -i '/CONFIG_QRTR_MHI=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_QRTR_MHI=y" >> $GITHUB_WORKSPACE/kout/.config
+
+            # Εξασφάλιση Qualcomm Peripheral Image Loader (PIL) για το Display Firmware
+            sed -i '/CONFIG_QCOM_PIL=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_QCOM_PIL=y" >> $GITHUB_WORKSPACE/kout/.config
+
+            # Διορθώσεις DRM & PMIC που βάλαμε πριν
             sed -i '/CONFIG_QCOM_PMIC_GLINK=/d' $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_QCOM_PMIC_GLINK=y" >> $GITHUB_WORKSPACE/kout/.config
-
-            # Απενεργοποίηση DRM PANEL Checkers που προκαλούν SIGSEGV αν το panel firmware διαφέρει
             sed -i '/CONFIG_DRM_PANEL_NOTIFY=/d' $GITHUB_WORKSPACE/kout/.config
             echo "# CONFIG_DRM_PANEL_NOTIFY is not set" >> $GITHUB_WORKSPACE/kout/.config
-
-            # Επιβολή σωστού DRM Driver για το Snapdragon 7s Gen 2 (sm7435 / garnet)
             sed -i '/CONFIG_DRM_MSM=/d' $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_DRM_MSM=y" >> $GITHUB_WORKSPACE/kout/.config
-            
-            sed -i '/CONFIG_DRM_MSM_REGISTER_LOGGING=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "# CONFIG_DRM_MSM_REGISTER_LOGGING is not set" >> $GITHUB_WORKSPACE/kout/.config
-
-            # Κλείσιμο του Data Corruption Panic
             sed -i '/CONFIG_PANIC_ON_DATA_CORRUPTION=/d' $GITHUB_WORKSPACE/kout/.config
             echo "# CONFIG_PANIC_ON_DATA_CORRUPTION is not set" >> $GITHUB_WORKSPACE/kout/.config
           fi
