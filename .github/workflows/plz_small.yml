@@ -304,17 +304,27 @@ jobs:
         run: |
           cd kernel_workspace/common
           
-          # Αφαίρεση του scm_version για καθαρό compilation
           if [ -f "scripts/setlocalversion" ]; then
             sed -i 's/${scm_version}//' scripts/setlocalversion
           fi
           
-          # Εφαρμογή του custom ονόματος στο τελικό .config
           if [ -f "$GITHUB_WORKSPACE/kout/.config" ]; then
+            # Αφαίρεση παλιών localversion
             sed -i '/CONFIG_LOCALVERSION=/d' $GITHUB_WORKSPACE/kout/.config
             sed -i '/CONFIG_LOCALVERSION_AUTO=/d' $GITHUB_WORKSPACE/kout/.config
             echo 'CONFIG_LOCALVERSION="-palaziks-ShiftPorts"' >> $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_LOCALVERSION_AUTO=n" >> $GITHUB_WORKSPACE/kout/.config
+
+            # [ΤΟ ΦΙΞ ΓΙΑ ΤΟ SIGSEGV]: Επιβολή σταθερότητας στους QTI / KGSL drivers
+            sed -i '/CONFIG_MSM_KGSL=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_MSM_KGSL=y" >> $GITHUB_WORKSPACE/kout/.config
+            
+            sed -i '/CONFIG_QCOM_KGSL=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_QCOM_KGSL=y" >> $GITHUB_WORKSPACE/kout/.config
+
+            # Απενεργοποίηση των Debugging Hooks που προκαλούν Null Pointers σε custom HALs
+            sed -i '/CONFIG_PANIC_ON_DATA_CORRUPTION=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "# CONFIG_PANIC_ON_DATA_CORRUPTION is not set" >> $GITHUB_WORKSPACE/kout/.config
           fi
 
       - name: 🔨 Build Kernel
