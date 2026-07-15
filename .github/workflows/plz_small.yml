@@ -1,4 +1,4 @@
-name: Kernel AOSP Garnet Build
+name: ⚡ Kernel AOSP Garnet Build
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-5.10-garnet
@@ -239,7 +239,7 @@ jobs:
         run: |
           cd kernel_workspace/common
           
-          # 1. Εισαγωγή ρυθμίσεων απευθείας στο gki_defconfig πριν το merge
+          # 1. Βασικές ρυθμίσεις απόδοσης
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_HEADERS_INSTALL=n"               >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_MODULES=y"                        >> arch/arm64/configs/gki_defconfig
@@ -248,6 +248,16 @@ jobs:
           
           echo "CONFIG_LLVM_POLLY=y"                    >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_LD_DEAD_CODE_DATA_ELIMINATION=y" >> arch/arm64/configs/gki_defconfig
+
+          # [ΤΟ ΜΥΣΤΙΚΟ ΓΙΑ AOSP]: Απενεργοποίηση HyperOS / Xiaomi Hooks που προκαλούν Bootloop
+          echo "# CONFIG_XIAOMI_MI_LOG is not set"        >> arch/arm64/configs/gki_defconfig
+          echo "# CONFIG_XIAOMI_BOOT_PROFILER is not set" >> arch/arm64/configs/gki_defconfig
+          echo "# CONFIG_RESERVE_MEM_DUMP is not set"     >> arch/arm64/configs/gki_defconfig
+          
+          # Εξασφάλιση συμβατότητας με AOSP Binder (Android 16 init)
+          echo "CONFIG_ANDROID_BINDER_IPC=y"              >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_ANDROID_BINDERFS=y"                >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_ANDROID_BINDER_DEVICES=\"binder,hwbinder,vndbinder\"" >> arch/arm64/configs/gki_defconfig
 
           # 2. Ρύθμιση του LTO
           if [[ "${{ github.event.inputs.lto_type }}" == "none" ]]; then
@@ -269,12 +279,10 @@ jobs:
         run: |
           cd kernel_workspace/common
           
-          # Αφαίρεση του scm_version
           if [ -f "scripts/setlocalversion" ]; then
             sed -i 's/${scm_version}//' scripts/setlocalversion
           fi
           
-          # Εφαρμογή του custom ονόματος στο παραγόμενο .config
           if [ -f "../out/.config" ]; then
             echo 'CONFIG_LOCALVERSION="-palaziks-ShiftPorts"' >> ../out/.config
             echo "CONFIG_LOCALVERSION_AUTO=n" >> ../out/.config
@@ -285,9 +293,7 @@ jobs:
           WORKDIR="$(pwd)"
           export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
           
-          # Paths για τον Clang και τα build-tools μέσα στο kernel_workspace
           export PATH="$WORKDIR/kernel_workspace/clang-r563880c/bin:$WORKDIR/kernel_workspace/build-tools/linux-x86/bin:$PATH"
-          CLANG_DIR="$WORKDIR/kernel_workspace/clang-r563880c/bin"
           
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
           export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
@@ -296,9 +302,8 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/kout
           mkdir -p $GITHUB_WORKSPACE/ldcache_garnet
 
-          # Αντιγραφή του συγχωνευμένου .config στον τελικό φάκελο εξόδου kout
-          #cp $WORKDIR/kernel_workspace/out/.config $GITHUB_WORKSPACE/kout/.config
-          curl -L "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_axion_a16" -o $GITHUB_WORKSPACE/kout/.config
+          # Χρήση του αποτελέσματος του merge_config
+          cp $WORKDIR/kernel_workspace/out/.config $GITHUB_WORKSPACE/kout/.config
 
           cd kernel_workspace/common
 
