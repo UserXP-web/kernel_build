@@ -320,6 +320,7 @@ jobs:
           WORKDIR="$(pwd)"
           export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
           
+          # [ΚΛΕΙΔΙ]: Βάζουμε τα binaries του Clang 21 πρώτα-πρώτα στο PATH
           export PATH="$WORKDIR/kernel_workspace/clang-r563880c/bin:$WORKDIR/kernel_workspace/build-tools/linux-x86/bin:$PATH"
           
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
@@ -328,22 +329,32 @@ jobs:
 
           cd kernel_workspace/common
 
+          # Ρύθμιση του ld-wrapper για το LTO
           echo '#!/bin/bash' > ld-wrapper
-          #echo 'ld.lld "$@" --thinlto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --thinlto-jobs=$(($(nproc --all) / 2))' >> ld-wrapper
           echo 'ld.lld "$@" --thinlto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --thinlto-jobs=2' >> ld-wrapper
           chmod +x ld-wrapper
 
-          # 1. Εκτέλεση olddefconfig για να ευθυγραμμιστεί το FleurX config με τον κώδικα (Crdroid ή EvoX)
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
-            CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD="$(pwd)/ld-wrapper" \
+          # [ΕΞΑΣΦΑΛΙΣΗ CLANG 21]: Ορίζουμε ρητά τις μεταβλητές για LLVM εργαλεία
+          export CC="ccache clang"
+          export LD="$(pwd)/ld-wrapper"
+          export HOSTLD="$(pwd)/ld-wrapper"
+          export AR=llvm-ar
+          export NM=llvm-nm
+          export OBJCOPY=llvm-objcopy
+          export OBJDUMP=llvm-objdump
+          export STRIP=llvm-strip
+
+          # 1. Εκτέλεση olddefconfig (Τώρα θα διαβάσει σωστά τον Clang 21.0.0)
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 \
             O=$GITHUB_WORKSPACE/kout \
+            CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
             olddefconfig
 
-          # 2. Μεταγλώττιση του Image (Καθαρό χτίσιμο χωρίς επιθετικά KCFLAGS)
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
-            CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD="$(pwd)/ld-wrapper" \
+          # 2. Μεταγλώττιση του Image
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 \
             O=$GITHUB_WORKSPACE/kout \
+            CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
             Image
 
