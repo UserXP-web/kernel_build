@@ -309,13 +309,32 @@ jobs:
           fi
           
           if [ -f "$GITHUB_WORKSPACE/kout/.config" ]; then
-            # Αφαίρεση παλιών localversion
+            # Αφαίρεση παλιών ρυθμίσεων Localversion
             sed -i '/CONFIG_LOCALVERSION=/d' $GITHUB_WORKSPACE/kout/.config
             sed -i '/CONFIG_LOCALVERSION_AUTO=/d' $GITHUB_WORKSPACE/kout/.config
             echo 'CONFIG_LOCALVERSION="-palaziks-ShiftPorts"' >> $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_LOCALVERSION_AUTO=n" >> $GITHUB_WORKSPACE/kout/.config
 
-            # [ΤΟ ΜΥΣΤΙΚΟ ΦΙΞ ΓΙΑ ΤΟ QMI / FIRMWARE CHANNEL]
+            # 1. [Η ΑΠΟΛΥΤΗ ΛΥΣΗ ΓΙΑ ΤΟ qcom_glink_is_wakeup ERROR]
+            # Ενεργοποίηση του κεντρικού RPMSG Framework (Υποχρεωτικό dependency)
+            sed -i '/CONFIG_RPMSG=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_RPMSG=y" >> $GITHUB_WORKSPACE/kout/.config
+            
+            sed -i '/CONFIG_RPMSG_CHAR=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_RPMSG_CHAR=y" >> $GITHUB_WORKSPACE/kout/.config
+
+            # Επιβολή του Qualcomm GLINK Core στατικά
+            sed -i '/CONFIG_RPMSG_QCOM_GLINK=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_RPMSG_QCOM_GLINK=y" >> $GITHUB_WORKSPACE/kout/.config
+
+            sed -i '/CONFIG_RPMSG_QCOM_GLINK_SMD=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_RPMSG_QCOM_GLINK_SMD=y" >> $GITHUB_WORKSPACE/kout/.config
+
+            # Ενεργοποίηση του Qualcomm SMD (Shared Memory Driver) Core
+            sed -i '/CONFIG_QCOM_SMD=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_QCOM_SMD=y" >> $GITHUB_WORKSPACE/kout/.config
+
+            # 2. [ΤΟ ΜΥΣΤΙΚΟ ΦΙΞ ΓΙΑ ΤΟ QMI / FIRMWARE CHANNEL]
             # Ενεργοποίηση του Qualcomm IPC Router (Απαραίτητο για WLAN & Display HALs)
             sed -i '/CONFIG_QRTR=/d' $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_QRTR=y" >> $GITHUB_WORKSPACE/kout/.config
@@ -330,21 +349,20 @@ jobs:
             sed -i '/CONFIG_QCOM_PIL=/d' $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_QCOM_PIL=y" >> $GITHUB_WORKSPACE/kout/.config
 
-            # [ΤΟ ΦΙΞ ΓΙΑ ΤΟ UNDEFINED SYMBOL: qcom_glink_is_wakeup]
-            # Ενεργοποίηση του Qualcomm GLINK Core Framework στατικά
-            sed -i '/CONFIG_RPMSG_QCOM_GLINK=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_RPMSG_QCOM_GLINK=y" >> $GITHUB_WORKSPACE/kout/.config
-
-            sed -i '/CONFIG_RPMSG_QCOM_GLINK_SMD=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_RPMSG_QCOM_GLINK_SMD=y" >> $GITHUB_WORKSPACE/kout/.config
-
-            # Διορθώσεις DRM & PMIC που βάλαμε πριν
+            # 3. [ΤΟ ΦΙΞ ΓΙΑ ΤΟ DISPLAY COMPOSER CRASH (SIGSEGV)]
             sed -i '/CONFIG_QCOM_PMIC_GLINK=/d' $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_QCOM_PMIC_GLINK=y" >> $GITHUB_WORKSPACE/kout/.config
+
             sed -i '/CONFIG_DRM_PANEL_NOTIFY=/d' $GITHUB_WORKSPACE/kout/.config
             echo "# CONFIG_DRM_PANEL_NOTIFY is not set" >> $GITHUB_WORKSPACE/kout/.config
+
             sed -i '/CONFIG_DRM_MSM=/d' $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_DRM_MSM=y" >> $GITHUB_WORKSPACE/kout/.config
+            
+            sed -i '/CONFIG_DRM_MSM_REGISTER_LOGGING=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "# CONFIG_DRM_MSM_REGISTER_LOGGING is not set" >> $GITHUB_WORKSPACE/kout/.config
+
+            # Κλείσιμο του Data Corruption Panic
             sed -i '/CONFIG_PANIC_ON_DATA_CORRUPTION=/d' $GITHUB_WORKSPACE/kout/.config
             echo "# CONFIG_PANIC_ON_DATA_CORRUPTION is not set" >> $GITHUB_WORKSPACE/kout/.config
           fi
