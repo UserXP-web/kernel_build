@@ -259,6 +259,14 @@ jobs:
           echo "CONFIG_ANDROID_BINDERFS=y"                >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_ANDROID_BINDER_DEVICES=\"binder,hwbinder,vndbinder\"" >> arch/arm64/configs/gki_defconfig
 
+          # [ΤΟ ΑΠΟΛΥΤΟ ΜΥΣΤΙΚΟ ΓΙΑ ANDROID 16 BOOT]
+          echo "CONFIG_BOOT_CONFIG=y"                   >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_CMDLINE_BOOTCONFIG=y"             >> arch/arm64/configs/gki_defconfig          
+          # Εξασφάλιση ότι το Page Size παραμένει στα 4096 (όπως ζητάει η ROM)
+          echo "CONFIG_ARM64_4K_PAGES=y"                 >> arch/arm64/configs/gki_defconfig
+          echo "# CONFIG_ARM64_16K_PAGES is not set"     >> arch/arm64/configs/gki_defconfig
+          echo "# CONFIG_ARM64_64K_PAGES is not set"     >> arch/arm64/configs/gki_defconfig
+
           # 2. Ρύθμιση του LTO
           if [[ "${{ github.event.inputs.lto_type }}" == "none" ]]; then
             echo "CONFIG_LTO_CLANG_NONE=y" >> arch/arm64/configs/gki_defconfig
