@@ -46,8 +46,7 @@ jobs:
 
       - name: 🧠 Add swap space (Optimized for LTO link)
         run: |
-          # Μειώνουμε το μέγεθος στα 6G για να μην στεγνώσει ο δίσκος
-          sudo fallocate -l 6G /mnt/swap_lto || sudo dd if=/dev/zero of=/mnt/swap_lto bs=1M count=6144
+          sudo fallocate -l 10G /mnt/swap_lto || sudo dd if=/dev/zero of=/mnt/swap_lto bs=1M count=10240
           sudo chmod 600 /mnt/swap_lto
           sudo mkswap /mnt/swap_lto
           sudo swapon /mnt/swap_lto
@@ -332,7 +331,8 @@ jobs:
           cd kernel_workspace/common
 
           echo '#!/bin/bash' > ld-wrapper
-          echo 'ld.lld "$@" --thinlto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --thinlto-jobs=$(($(nproc --all) / 2))' >> ld-wrapper
+          #echo 'ld.lld "$@" --thinlto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --thinlto-jobs=$(($(nproc --all) / 2))' >> ld-wrapper
+          echo 'ld.lld "$@" --thinlto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --thinlto-jobs=2' >> ld-wrapper
           chmod +x ld-wrapper
 
           # 1. Εκτέλεση olddefconfig για να ευθυγραμμιστεί το FleurX config με τον κώδικα (Crdroid ή EvoX)
