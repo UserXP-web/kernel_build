@@ -330,6 +330,14 @@ jobs:
             sed -i '/CONFIG_QCOM_PIL=/d' $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_QCOM_PIL=y" >> $GITHUB_WORKSPACE/kout/.config
 
+            # [ΤΟ ΦΙΞ ΓΙΑ ΤΟ UNDEFINED SYMBOL: qcom_glink_is_wakeup]
+            # Ενεργοποίηση του Qualcomm GLINK Core Framework στατικά
+            sed -i '/CONFIG_RPMSG_QCOM_GLINK=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_RPMSG_QCOM_GLINK=y" >> $GITHUB_WORKSPACE/kout/.config
+
+            sed -i '/CONFIG_RPMSG_QCOM_GLINK_SMD=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_RPMSG_QCOM_GLINK_SMD=y" >> $GITHUB_WORKSPACE/kout/.config
+
             # Διορθώσεις DRM & PMIC που βάλαμε πριν
             sed -i '/CONFIG_QCOM_PMIC_GLINK=/d' $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_QCOM_PMIC_GLINK=y" >> $GITHUB_WORKSPACE/kout/.config
