@@ -289,13 +289,15 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/kout
           mkdir -p $GITHUB_WORKSPACE/ldcache_garnet
           
-          # [ΔΙΟΡΘΩΜΕΝΟ PATH]: Αντιγραφή με χρήση της καθολικής μεταβλητής του workspace
-          if [ -f "$GITHUB_WORKSPACE/configs/config_from_fleurx" ]; then
-            #https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_fleurx
-            cp $GITHUB_WORKSPACE/configs/config_from_fleurx $GITHUB_WORKSPACE/kout/.config
-            echo "✅ FleurX config found and copied successfully!"
+          # [ΤΟ ΜΥΣΤΙΚΟ]: Κατεβάζουμε το έγκυρο config απευθείας από το raw URL του GitHub σου
+          echo "Downloading config_from_fleurx..."
+          curl -L "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_fleurx" -o $GITHUB_WORKSPACE/kout/.config
+
+          # Έλεγχος αν το αρχείο κατέβηκε επιτυχώς και δεν είναι άδειο
+          if [ -s "$GITHUB_WORKSPACE/kout/.config" ]; then
+            echo "✅ FleurX config downloaded successfully!"
           else
-            echo "❌ ERROR: config_from_fleurx not found at $GITHUB_WORKSPACE/configs/"
+            echo "❌ ERROR: Failed to download config_from_fleurx or file is empty!"
             exit 1
           fi
 
