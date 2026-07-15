@@ -103,9 +103,9 @@ jobs:
 
           # ΕΚΤΕΛΕΣΗ CLONE ΣΤΟ ΠΡΟΣΚΗΝΙΟ (Foreground) για άμεση καταγραφή σφαλμάτων
           echo "Cloning source repository..."
-          git clone --depth=1 https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet -b bka kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
+          #git clone --depth=1 https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet -b bka kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
           #git clone --depth=1 "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet" -b Zen-Itsu-Garnet kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
-          #git clone --depth=1 https://github.com/crdroidandroid/android_xiaomi_kernel_garnet -b 16.0 kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
+          git clone --depth=1 https://github.com/crdroidandroid/android_xiaomi_kernel_garnet -b 16.0 kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
           #echo "🌐 Initialize kernel repository..."
           ##mkdir -p android && cd android          
           #MANIFEST_URL="https://github.com/UserXP-web/kernel_build" # ${{ env.manifest_url }}
