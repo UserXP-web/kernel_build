@@ -1,4 +1,4 @@
-name: ~Valid Garnet Kernel
+name: ~⚡ Valid Garnet Kernel
 
 on:
   workflow_dispatch:
@@ -15,6 +15,19 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y bc bison build-essential ccache flex g++-multilib gcc-multilib git gnupg gperf lib32readline-dev lib32z1-dev liblz4-tool libncurses5-dev libsdl2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python3 python-is-python3 libelf-dev lld
 
+      - name: 📥 Install Repo Tool
+        run: |
+          if ! command -v repo &> /dev/null; then
+              echo "⬇️ Installing 'repo'..."
+              mkdir -p ~/bin  # Create bin directory if it doesn't exist
+              curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+              chmod a+x ~/bin/repo
+              sudo ln -sf ~/bin/repo /usr/bin/repo
+              echo "✅ The repo tool is installed."
+          else
+              echo "ℹ️ 'repo' command exist."
+          fi
+
       - name: 🛠️ Download Lightweight AOSP Clang
         run: |
           mkdir -p clang
@@ -25,11 +38,25 @@ jobs:
 
       - name: 🌲 Clone Kernel Source
         run: |
-          git clone --depth=1 "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet" -b Zen-Itsu-Garnet source
+          echo "<> Clone source..."
+          mkdir -p ./common # android/common
+          #git clone --depth=1 -b bka "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet" ./common
+          git clone --depth=1 "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet" -b Zen-Itsu-Garnet ./common
+          
+          #echo "🌐 Initialize kernel repository..."
+          ##mkdir -p android && cd android          
+          #MANIFEST_URL="https://github.com/UserXP-web/kernel_build" # ${{ env.manifest_url }}
+          #MANIFEST_BRANCH="main" # ${{ env.manifest_branch }}
+          #MANIFEST_XML="manifest/zylhdrXP.xml" # manifest/${{ inputs.MANIFEST_selection }}.xml
+          #echo "~ $MANIFEST_URL ^^^ $MANIFEST_BRANCH --- $MANIFEST_XML"        
+          #repo init --depth=1 -u $MANIFEST_URL -b $MANIFEST_BRANCH -m $MANIFEST_XML
+          #echo "🔄 Synchronize the codebase (using $(nproc --all) threads)..."
+          #repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle --force-sync
+          #echo "✅ Kernel source code cloning complete"
 
       - name: 🧩 Merge Defconfigs
         run: |
-          cd source
+          cd common
           rm -rf out .config
           make ARCH=arm64 mrproper
           
@@ -60,7 +87,7 @@ jobs:
 
       - name: 🔨 Compile Valid Image
         run: |
-          cd source
+          cd common
           
           # Ορισμός του σωστού φακέλου bin του Clang 21
           CLANG_PATH=$(realpath ../clang/bin)
@@ -97,14 +124,21 @@ jobs:
             Image
 
       - name: 📦 Prepare AnyKernel3
+        id: prepare_ak3
         run: |
           git clone --depth=1 "https://github.com/osm0sis/AnyKernel3" AnyKernel3
-          cp source/out/arch/arm64/boot/Image AnyKernel3/
+          cp common/out/arch/arm64/boot/Image AnyKernel3/
           cd AnyKernel3
           sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel.sh
 
-      - name: 📤 Upload Valid Kernel Artifact
+          AK3_NAME=Valid_kernel_5.10.236-AnyKernel3.zip
+          #zip -r ../$AK3_NAME ./*
+          echo "ak3name=$AK3_NAME" >> $GITHUB_OUTPUT
+
+      - name: 📤 Upload AnyKernel3
         uses: actions/upload-artifact@v4
         with:
-          name: Valid-Garnet-Kernel
-          path: AnyKernel3/*
+          name: ${{ steps.prepare_ak3.outputs.ak3name }}
+          path: ${{ github.workspace }}/AnyKernel3/**
+          if-no-files-found: ignore
+          compression-level: 9
