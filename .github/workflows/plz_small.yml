@@ -122,7 +122,14 @@ jobs:
           echo "Removing ABI protection & dirty suffix..."
           rm kernel_workspace/common/abi_gki_protected_exports_* 2>/dev/null || true
           rm kernel_workspace/common/android/abi_gki_protected_exports_* 2>/dev/null || true
-          
+
+          # [ΤΟ ΑΠΟΛΥΤΟ HACK ΓΙΑ ΤΟ qcom_glink_is_wakeup]
+          # Αντικαθιστούμε την κλήση της συνάρτησης με σταθερό 0 (false) απευθείας στον C κώδικα
+          if [ -f "kernel_workspace/common/net/qrtr/smd.c" ]; then
+            sed -i 's/qcom_glink_is_wakeup([^)]*)/0/g' kernel_workspace/common/net/qrtr/smd.c
+            echo "✅ C-Code patched: qcom_glink_is_wakeup replaced with 0!"
+          fi
+
           for f in kernel_workspace/common/scripts/setlocalversion; do
             if [ -f "$f" ]; then
               sed -i 's/ -dirty//g' "$f"
