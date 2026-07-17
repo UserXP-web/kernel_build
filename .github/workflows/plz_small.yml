@@ -123,13 +123,6 @@ jobs:
           rm kernel_workspace/common/abi_gki_protected_exports_* 2>/dev/null || true
           rm kernel_workspace/common/android/abi_gki_protected_exports_* 2>/dev/null || true
 
-          # [ΤΟ ΑΠΟΛΥΤΟ HACK ΓΙΑ ΤΟ qcom_glink_is_wakeup]
-          # Αντικαθιστούμε την κλήση της συνάρτησης με σταθερό 0 (false) απευθείας στον C κώδικα
-          if [ -f "kernel_workspace/common/net/qrtr/smd.c" ]; then
-            sed -i 's/qcom_glink_is_wakeup([^)]*)/0/g' kernel_workspace/common/net/qrtr/smd.c
-            echo "✅ C-Code patched: qcom_glink_is_wakeup replaced with 0!"
-          fi
-
           for f in kernel_workspace/common/scripts/setlocalversion; do
             if [ -f "$f" ]; then
               sed -i 's/ -dirty//g' "$f"
@@ -316,66 +309,10 @@ jobs:
           fi
           
           if [ -f "$GITHUB_WORKSPACE/kout/.config" ]; then
-            # Αφαίρεση παλιών ρυθμίσεων Localversion
             sed -i '/CONFIG_LOCALVERSION=/d' $GITHUB_WORKSPACE/kout/.config
             sed -i '/CONFIG_LOCALVERSION_AUTO=/d' $GITHUB_WORKSPACE/kout/.config
             echo 'CONFIG_LOCALVERSION="-palaziks-ShiftPorts"' >> $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_LOCALVERSION_AUTO=n" >> $GITHUB_WORKSPACE/kout/.config
-
-            # 1. [ΕΠΙΘΕΤΙΚΟ FIX ΓΙΑ qcom_glink_is_wakeup & DEPENDENCIES]
-            sed -i '/CONFIG_RPMSG=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_RPMSG=y" >> $GITHUB_WORKSPACE/kout/.config
-            
-            sed -i '/CONFIG_RPMSG_CHAR=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_RPMSG_CHAR=y" >> $GITHUB_WORKSPACE/kout/.config
-
-            sed -i '/CONFIG_RPMSG_QCOM_GLINK=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_RPMSG_QCOM_GLINK=y" >> $GITHUB_WORKSPACE/kout/.config
-
-            sed -i '/CONFIG_RPMSG_QCOM_GLINK_SMD=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_RPMSG_QCOM_GLINK_SMD=y" >> $GITHUB_WORKSPACE/kout/.config
-
-            sed -i '/CONFIG_QCOM_SMD=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_QCOM_SMD=y" >> $GITHUB_WORKSPACE/kout/.config
-
-            # Ενεργοποίηση των Xiaomi/Qcom Power Drivers που περιέχουν το Glink Wakeup
-            sed -i '/CONFIG_QCOM_AOSS_TCS=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_QCOM_AOSS_TCS=y" >> $GITHUB_WORKSPACE/kout/.config
-
-            sed -i '/CONFIG_QCOM_COMMAND_DB=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_QCOM_COMMAND_DB=y" >> $GITHUB_WORKSPACE/kout/.config
-
-            sed -i '/CONFIG_QCOM_RPMH=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_QCOM_RPMH=y" >> $GITHUB_WORKSPACE/kout/.config
-
-            sed -i '/CONFIG_QCOM_RPMHPD=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_QCOM_RPMHPD=y" >> $GITHUB_WORKSPACE/kout/.config
-
-            # 2. [ΦΙΞ ΓΙΑ ΤΟ QMI / FIRMWARE CHANNEL]
-            sed -i '/CONFIG_QRTR=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_QRTR=y" >> $GITHUB_WORKSPACE/kout/.config
-            
-            sed -i '/CONFIG_QRTR_SMD=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_QRTR_SMD=y" >> $GITHUB_WORKSPACE/kout/.config
-
-            sed -i '/CONFIG_QRTR_MHI=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_QRTR_MHI=y" >> $GITHUB_WORKSPACE/kout/.config
-
-            sed -i '/CONFIG_QCOM_PIL=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_QCOM_PIL=y" >> $GITHUB_WORKSPACE/kout/.config
-
-            # 3. [ΦΙΞ ΓΙΑ ΤΟ DISPLAY COMPOSER CRASH (SIGSEGV)]
-            sed -i '/CONFIG_QCOM_PMIC_GLINK=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_QCOM_PMIC_GLINK=y" >> $GITHUB_WORKSPACE/kout/.config
-
-            sed -i '/CONFIG_DRM_PANEL_NOTIFY=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "# CONFIG_DRM_PANEL_NOTIFY is not set" >> $GITHUB_WORKSPACE/kout/.config
-
-            sed -i '/CONFIG_DRM_MSM=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_DRM_MSM=y" >> $GITHUB_WORKSPACE/kout/.config
-
-            sed -i '/CONFIG_PANIC_ON_DATA_CORRUPTION=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "# CONFIG_PANIC_ON_DATA_CORRUPTION is not set" >> $GITHUB_WORKSPACE/kout/.config
           fi
 
       - name: 🔨 Build Kernel
@@ -383,7 +320,6 @@ jobs:
           WORKDIR="$(pwd)"
           export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
           
-          # [ΚΛΕΙΔΙ]: Βάζουμε τα binaries του Clang 21 πρώτα-πρώτα στο PATH
           export PATH="$WORKDIR/kernel_workspace/clang-r563880c/bin:$WORKDIR/kernel_workspace/build-tools/linux-x86/bin:$PATH"
           
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
@@ -392,12 +328,10 @@ jobs:
 
           cd kernel_workspace/common
 
-          # Ρύθμιση του ld-wrapper για το LTO
           echo '#!/bin/bash' > ld-wrapper
           echo 'ld.lld "$@" --thinlto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --thinlto-jobs=2' >> ld-wrapper
           chmod +x ld-wrapper
 
-          # [ΕΞΑΣΦΑΛΙΣΗ CLANG 21]: Ορίζουμε ρητά τις μεταβλητές για LLVM εργαλεία
           export CC="ccache clang"
           export LD="$(pwd)/ld-wrapper"
           export HOSTLD="$(pwd)/ld-wrapper"
@@ -407,17 +341,62 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
 
-          # 1. Εκτέλεση olddefconfig (Τώρα θα διαβάσει σωστά τον Clang 21.0.0)
+          # 1. Εκτέλεση olddefconfig (Ευθυγράμμιση αρχικού config)
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 \
             O=$GITHUB_WORKSPACE/kout \
-            CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
             olddefconfig
 
-          # 2. Μεταγλώττιση του Image
+          # [Η ΣΦΗΝΑ]: Επιβολή των flags ΜΕΤΑ το olddefconfig για να μην σβηστούν!
+          if [ -f "$GITHUB_WORKSPACE/kout/.config" ]; then
+            echo "Force-injecting static flags into final .config..."
+            
+            # GLINK & RPMSG Core
+            sed -i '/CONFIG_RPMSG=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_RPMSG=y" >> $GITHUB_WORKSPACE/kout/.config
+            sed -i '/CONFIG_RPMSG_CHAR=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_RPMSG_CHAR=y" >> $GITHUB_WORKSPACE/kout/.config
+            sed -i '/CONFIG_RPMSG_QCOM_GLINK=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_RPMSG_QCOM_GLINK=y" >> $GITHUB_WORKSPACE/kout/.config
+            sed -i '/CONFIG_RPMSG_QCOM_GLINK_SMD=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_RPMSG_QCOM_GLINK_SMD=y" >> $GITHUB_WORKSPACE/kout/.config
+            sed -i '/CONFIG_QCOM_SMD=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_QCOM_SMD=y" >> $GITHUB_WORKSPACE/kout/.config
+
+            # Power & Subsystems
+            sed -i '/CONFIG_QCOM_AOSS_TCS=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_QCOM_AOSS_TCS=y" >> $GITHUB_WORKSPACE/kout/.config
+            sed -i '/CONFIG_QCOM_COMMAND_DB=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_QCOM_COMMAND_DB=y" >> $GITHUB_WORKSPACE/kout/.config
+            sed -i '/CONFIG_QCOM_RPMH=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_QCOM_RPMH=y" >> $GITHUB_WORKSPACE/kout/.config
+            sed -i '/CONFIG_QCOM_RPMHPD=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_QCOM_RPMHPD=y" >> $GITHUB_WORKSPACE/kout/.config
+
+            # QMI / QRTR Channel
+            sed -i '/CONFIG_QRTR=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_QRTR=y" >> $GITHUB_WORKSPACE/kout/.config
+            sed -i '/CONFIG_QRTR_SMD=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_QRTR_SMD=y" >> $GITHUB_WORKSPACE/kout/.config
+            sed -i '/CONFIG_QRTR_MHI=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_QRTR_MHI=y" >> $GITHUB_WORKSPACE/kout/.config
+            sed -i '/CONFIG_QCOM_PIL=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_QCOM_PIL=y" >> $GITHUB_WORKSPACE/kout/.config
+
+            # Display Composer Fixes
+            sed -i '/CONFIG_QCOM_PMIC_GLINK=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_QCOM_PMIC_GLINK=y" >> $GITHUB_WORKSPACE/kout/.config
+            sed -i '/CONFIG_DRM_PANEL_NOTIFY=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "# CONFIG_DRM_PANEL_NOTIFY is not set" >> $GITHUB_WORKSPACE/kout/.config
+            sed -i '/CONFIG_DRM_MSM=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_DRM_MSM=y" >> $GITHUB_WORKSPACE/kout/.config
+            sed -i '/CONFIG_PANIC_ON_DATA_CORRUPTION=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "# CONFIG_PANIC_ON_DATA_CORRUPTION is not set" >> $GITHUB_WORKSPACE/kout/.config
+          fi
+
+          # 2. Μεταγλώττιση του Image με το τροποποιημένο τελικό .config
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 \
             O=$GITHUB_WORKSPACE/kout \
-            CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
             Image
 
