@@ -394,7 +394,7 @@ jobs:
 
           # Ρύθμιση του ld-wrapper για το LTO
           echo '#!/bin/bash' > ld-wrapper
-          echo 'ld.lld "$@" --thinlto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --thinlto-jobs=2 --allow-shlib-undefined' >> ld-wrapper
+          echo 'ld.lld "$@" --thinlto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --thinlto-jobs=2' >> ld-wrapper
           chmod +x ld-wrapper
 
           # [ΕΞΑΣΦΑΛΙΣΗ CLANG 21]: Ορίζουμε ρητά τις μεταβλητές για LLVM εργαλεία
