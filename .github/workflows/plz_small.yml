@@ -341,60 +341,21 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
 
-          # 1. Εκτέλεση olddefconfig (Ευθυγράμμιση αρχικού config)
+          # 1. Εκτέλεση olddefconfig
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 \
             O=$GITHUB_WORKSPACE/kout \
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
             olddefconfig
 
-          # [Η ΣΦΗΝΑ]: Επιβολή των flags ΜΕΤΑ το olddefconfig για να μην σβηστούν!
+          # [Η ΑΠΛΗ ΛΥΣΗ]: Κλείνουμε τον προβληματικό SMD driver και ανοίγουμε το generic QRTR
           if [ -f "$GITHUB_WORKSPACE/kout/.config" ]; then
-            echo "Force-injecting static flags into final .config..."
-            
-            # GLINK & RPMSG Core
-            sed -i '/CONFIG_RPMSG=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_RPMSG=y" >> $GITHUB_WORKSPACE/kout/.config
-            sed -i '/CONFIG_RPMSG_CHAR=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_RPMSG_CHAR=y" >> $GITHUB_WORKSPACE/kout/.config
-            sed -i '/CONFIG_RPMSG_QCOM_GLINK=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_RPMSG_QCOM_GLINK=y" >> $GITHUB_WORKSPACE/kout/.config
-            sed -i '/CONFIG_RPMSG_QCOM_GLINK_SMD=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_RPMSG_QCOM_GLINK_SMD=y" >> $GITHUB_WORKSPACE/kout/.config
-            sed -i '/CONFIG_QCOM_SMD=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_QCOM_SMD=y" >> $GITHUB_WORKSPACE/kout/.config
-
-            # Power & Subsystems
-            sed -i '/CONFIG_QCOM_AOSS_TCS=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_QCOM_AOSS_TCS=y" >> $GITHUB_WORKSPACE/kout/.config
-            sed -i '/CONFIG_QCOM_COMMAND_DB=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_QCOM_COMMAND_DB=y" >> $GITHUB_WORKSPACE/kout/.config
-            sed -i '/CONFIG_QCOM_RPMH=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_QCOM_RPMH=y" >> $GITHUB_WORKSPACE/kout/.config
-            sed -i '/CONFIG_QCOM_RPMHPD=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_QCOM_RPMHPD=y" >> $GITHUB_WORKSPACE/kout/.config
-
-            # QMI / QRTR Channel
-            sed -i '/CONFIG_QRTR=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "Simplifying QRTR config..."
+            sed -i 's/CONFIG_QRTR_SMD=y/CONFIG_QRTR_SMD=n/g' $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_QRTR=y" >> $GITHUB_WORKSPACE/kout/.config
-            sed -i '/CONFIG_QRTR_SMD=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_QRTR_SMD=y" >> $GITHUB_WORKSPACE/kout/.config
-            sed -i '/CONFIG_QRTR_MHI=/d' $GITHUB_WORKSPACE/kout/.config
             echo "CONFIG_QRTR_MHI=y" >> $GITHUB_WORKSPACE/kout/.config
-            sed -i '/CONFIG_QCOM_PIL=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_QCOM_PIL=y" >> $GITHUB_WORKSPACE/kout/.config
-
-            # Display Composer Fixes
-            sed -i '/CONFIG_QCOM_PMIC_GLINK=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_QCOM_PMIC_GLINK=y" >> $GITHUB_WORKSPACE/kout/.config
-            sed -i '/CONFIG_DRM_PANEL_NOTIFY=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "# CONFIG_DRM_PANEL_NOTIFY is not set" >> $GITHUB_WORKSPACE/kout/.config
-            sed -i '/CONFIG_DRM_MSM=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_DRM_MSM=y" >> $GITHUB_WORKSPACE/kout/.config
-            sed -i '/CONFIG_PANIC_ON_DATA_CORRUPTION=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "# CONFIG_PANIC_ON_DATA_CORRUPTION is not set" >> $GITHUB_WORKSPACE/kout/.config
           fi
 
-          # 2. Μεταγλώττιση του Image με το τροποποιημένο τελικό .config
+          # 2. Μεταγλώττιση του Image
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 \
             O=$GITHUB_WORKSPACE/kout \
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
