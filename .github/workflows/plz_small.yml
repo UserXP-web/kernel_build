@@ -422,17 +422,23 @@ jobs:
         id: create_zip
         run: |
           cd kernel_workspace
-          git clone https://github.com/palazik/AnyKernel3 --depth=1
+          git clone https://github.com --depth=1
           rm -rf ./AnyKernel3/.git
-          cd AnyKernel3          
+          cd AnyKernel3
+          
+          # Αντιγραφή του Kernel Image
           cp $GITHUB_WORKSPACE/kout/arch/arm64/boot/Image ./Image
           
-          # [ΤΟ ΚΛΕΙΔΙ]: Μαζεύουμε όλα τα modules και τα βάζουμε στο zip
-          mkdir -p ./modules/vendor/lib/modules/
-          find $GITHUB_WORKSPACE/kout/ -name "*.ko" -exec cp {} ./modules/vendor/lib/modules/ \;
+          # [ΤΟ ΣΩΣΤΟ PATCH]: Ρίχνουμε τα 301 modules χύμα στον κεντρικό φάκελο modules/
+          mkdir -p ./modules
+          find $GITHUB_WORKSPACE/kout/ -name "*.ko" -exec cp {} ./modules/ \;
 
+          if [[ ! -f ./Image ]]; then
+            echo "Kernel Image not found, build may have failed."
+            exit 1
+          fi
           AK3_NAME=AnyKernel3_AOSP_5.10_Garnet_palaziks_AOSP-ShiftPorts.zip
-          echo "ak3name=$AK3_NAME" >> $GITHUB_OUTPUT
+          echo "ak3name=$AK3_OUTPUT" >> $GITHUB_OUTPUT
 
       - name: 📤 Upload AnyKernel3
         uses: actions/upload-artifact@v4
