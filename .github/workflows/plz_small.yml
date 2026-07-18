@@ -10,6 +10,8 @@ env:
   KERNEL_VERSION: '5.10'
   KERNEL_NAME: 'kernel_xiaomi_garnet'
   CCACHE_KEY: ccache-garnet-5.10
+  FLEURX_LINK: "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_fleurx"
+  AK3_LINK: "https://github.com/palazik/AnyKernel3"
 
 on:
   workflow_dispatch:
@@ -291,7 +293,7 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/ldcache_garnet
           
           echo "Downloading config_from_fleurx..."
-          curl -L "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_fleurx" -o $GITHUB_WORKSPACE/kout/.config
+          curl -L "${{ env.FLEURX_LINK }}" -o $GITHUB_WORKSPACE/kout/.config
 
           if [ -s "$GITHUB_WORKSPACE/kout/.config" ]; then
             echo "✅ FleurX config downloaded successfully!"
@@ -445,10 +447,10 @@ jobs:
         id: create_zip
         run: |
           cd kernel_workspace
-          git clone https://github.com/palazik/AnyKernel3 --depth=1
-          rm -rf ./AnyKernel3/.git
+          rm -rf AnyKernel3 2>/dev/null || true
+          git clone --depth=1 "${{ env.AK3_LINK }}" AnyKernel3
+          rm -rf AnyKernel3/.git
           cd AnyKernel3
-          
           # Αντιγραφή του Kernel Image
           cp $GITHUB_WORKSPACE/kout/arch/arm64/boot/Image ./Image
           
@@ -460,8 +462,8 @@ jobs:
             echo "Kernel Image not found, build may have failed."
             exit 1
           fi
-          AK3_NAME=AnyKernel3_AOSP_5.10_Garnet_palaziks_AOSP-ShiftPorts.zip
-          echo "ak3name=$AK3_OUTPUT" >> $GITHUB_OUTPUT
+          AK3_NAME=AnyKernel3_AOSP_5.10_Garnet_UserXP-Gem.zip
+          echo "ak3name=$AK3_NAME" >> $GITHUB_OUTPUT
 
       - name: 📤 Upload AnyKernel3
         uses: actions/upload-artifact@v4
