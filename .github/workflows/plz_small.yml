@@ -10,10 +10,10 @@ env:
   KERNEL_VERSION: '5.10'
   KERNEL_NAME: 'kernel_xiaomi_garnet'
   CCACHE_KEY: ccache-garnet-5.10
-  #kernel_link: "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet"
-  #kernel_branch: "bka"
-  kernel_link: "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet"
-  kernel_branch: "Zen-Itsu-Garnet"
+  kernel_link: "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet"
+  kernel_branch: "bka"
+  #kernel_link: "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet"
+  #kernel_branch: "Zen-Itsu-Garnet"
   #kernel_link: "https://github.com/zylhdrXP/android_kernel_xiaomi_sm7435"
   #kernel_branch: "lineage-23.2"
   #kernel_link: "https://github.com/crdroidandroid/android_xiaomi_kernel_garnet"
