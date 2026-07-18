@@ -347,11 +347,11 @@ jobs:
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
             olddefconfig
 
-          # 2. Μεταγλώττιση του Image (Χωρίς καμία χειροκίνητη αλλαγή)
+          # 2. Μεταγλώττιση του Image ΚΑΙ των Modules
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 \
             O=$GITHUB_WORKSPACE/kout \
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
-            Image
+            Image modules
 
           echo "Kernel Compilation Complete!"
           ccache -c
