@@ -302,34 +302,18 @@ jobs:
             exit 1
           fi
 
-      - name: 🛠️ Inject Custom AOSP Static GLINK Fix
+      - name: 🛠️ Inject Custom AOSP Modules Fix
         run: |
           CONF="$GITHUB_WORKSPACE/kout/.config"
           
-          # Καθαρισμός των flags που ήταν ρυθμισμένα ως modules (=m) ή έλειπαν
+          # Καθαρισμός προηγούμενων πειραμάτων
           sed -i '/CONFIG_PMIC_GLINK/d' $CONF
-          sed -i '/CONFIG_RPMSG_QCOM_GLINK/d' $CONF
-          sed -i '/CONFIG_QCOM_PDR_HELPERS/d' $CONF
-          sed -i '/CONFIG_QCOM_COMMAND_DB/d' $CONF
-          sed -i '/CONFIG_RPMSG_CHAR/d' $CONF
           
-          # Εξαναγκασμός μετατροπής σε Στατικά (=y) για επίλυση του Linker Error
-          echo "CONFIG_RPMSG_QCOM_GLINK=y" >> $CONF
-          echo "CONFIG_RPMSG_CHAR=y" >> $CONF
-          echo "CONFIG_RPMSG_QCOM_GLINK_SMEM=y" >> $CONF
-          echo "CONFIG_RPMSG_QCOM_GLINK_RPM=y" >> $CONF
-          echo "CONFIG_QCOM_COMMAND_DB=y" >> $CONF
-          echo "CONFIG_QCOM_PDR_HELPERS=y" >> $CONF
-          echo "CONFIG_PMIC_GLINK=y" >> $CONF
-          echo "CONFIG_PMIC_GLINK_ALTMODE=y" >> $CONF
+          # Εισαγωγή ΜΟΝΟ του PMIC_GLINK ως MODULE (=m)
+          echo "CONFIG_PMIC_GLINK=m" >> $CONF
+          echo "CONFIG_PMIC_GLINK_ALTMODE=m" >> $CONF
           
-          # Εξασφάλιση συμβατότητας με AOSP Binder (Android 16 init)
-          sed -i '/CONFIG_ANDROID_BINDER/d' $CONF
-          echo "CONFIG_ANDROID_BINDER_IPC=y" >> $CONF
-          echo "CONFIG_ANDROID_BINDERFS=y" >> $CONF
-          echo 'CONFIG_ANDROID_BINDER_DEVICES="binder,hwbinder,vndbinder"' >> $CONF
-          
-          echo "✅ Config injected successfully with CONFIG_RPMSG_QCOM_GLINK=y!"
+          echo "✅ PMIC_GLINK injected successfully as Module (=m)!"
 
       - name: 📦 Add build name
         run: |
