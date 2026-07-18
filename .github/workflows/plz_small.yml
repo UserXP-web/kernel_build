@@ -308,12 +308,14 @@ jobs:
           
           # Καθαρισμός προηγούμενων πειραμάτων
           sed -i '/CONFIG_PMIC_GLINK/d' $CONF
+          sed -i '/CONFIG_QCOM_PMIC_GLINK/d' $CONF
           
-          # Εισαγωγή ΜΟΝΟ του PMIC_GLINK ως MODULE (=m)
+          # Εισαγωγή του PMIC_GLINK και του απαραίτητου Client Sub-driver ως Modules (=m)
           echo "CONFIG_PMIC_GLINK=m" >> $CONF
           echo "CONFIG_PMIC_GLINK_ALTMODE=m" >> $CONF
+          echo "CONFIG_QCOM_PMIC_GLINK=m" >> $CONF
           
-          echo "✅ PMIC_GLINK injected successfully as Module (=m)!"
+          echo "✅ PMIC_GLINK and Client driver injected successfully as Modules!"
 
       - name: 📦 Add build name
         run: |
