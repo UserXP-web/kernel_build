@@ -310,6 +310,7 @@ jobs:
           fi
 
       - name: 🛠️ Inject Custom AOSP Modules Fix
+        if: false
         run: |
           CONF="$GITHUB_WORKSPACE/kout/.config"
           
