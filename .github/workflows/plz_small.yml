@@ -319,9 +319,7 @@ jobs:
         run: |
           WORKDIR="$(pwd)"
           export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
-          
           export PATH="$WORKDIR/kernel_workspace/clang-r563880c/bin:$WORKDIR/kernel_workspace/build-tools/linux-x86/bin:$PATH"
-          
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
           export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
           export CCACHE_IS_KERNEL_COMPILING=true
@@ -341,23 +339,19 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
 
-          # 1. Εκτέλεση olddefconfig (Καθαρή ευθυγράμμιση του FleurX config)
+          # 1. Καθαρή ευθυγράμμιση
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 \
             O=$GITHUB_WORKSPACE/kout \
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
             olddefconfig
 
-          # 2. Μεταγλώττιση του Image ΚΑΙ των Modules
+          # 2. Μεταγλώττιση ΜΟΝΟ του Image (Χωρίς modules)
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 \
             O=$GITHUB_WORKSPACE/kout \
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
-            Image modules
+            Image
 
           echo "Kernel Compilation Complete!"
-          ccache -c
-          ccache --evict-older-than 10800s
-          ccache -s
-          df -h
 
       - name: 🔨 Build Kernel (old)
         if: false
@@ -429,9 +423,9 @@ jobs:
           # Αντιγραφή του Kernel Image
           cp $GITHUB_WORKSPACE/kout/arch/arm64/boot/Image ./Image
           
-          # [ΤΟ ΣΩΣΤΟ PATCH]: Ρίχνουμε τα 301 modules χύμα στον κεντρικό φάκελο modules/
-          mkdir -p ./modules
-          find $GITHUB_WORKSPACE/kout/ -name "*.ko" -exec cp {} ./modules/ \;
+          ## [ΤΟ ΣΩΣΤΟ PATCH]: Ρίχνουμε τα 301 modules χύμα στον κεντρικό φάκελο modules/
+          #mkdir -p ./modules
+          #find $GITHUB_WORKSPACE/kout/ -name "*.ko" -exec cp {} ./modules/ \;
 
           if [[ ! -f ./Image ]]; then
             echo "Kernel Image not found, build may have failed."
