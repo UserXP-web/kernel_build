@@ -10,7 +10,9 @@ env:
   KERNEL_VERSION: '5.10'
   KERNEL_NAME: 'kernel_xiaomi_garnet'
   CCACHE_KEY: ccache-garnet-5.10
-  FLEURX_LINK: "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_fleurx"
+  CLANG_LINK: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android16-qpr2-release/clang-r563880c.tar.gz"
+  BUILD_TOOLS_LINK: "https://git.codelinaro.org/clo/la/kernel/prebuilts/build-tools.git"
+  FINAL_CONFIG_LINK: "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_fleurx"
   AK3_LINK: "https://github.com/palazik/AnyKernel3"
 
 on:
@@ -83,7 +85,7 @@ jobs:
             mkdir -p kernel_workspace/clang-r563880c
             aria2c -x16 -s16 -k1M -j16 --retry-wait=5 --max-tries=10 \
               -d /tmp -o clang-r563880c.tar.gz \
-              "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android16-qpr2-release/clang-r563880c.tar.gz"
+              "${{ env.CLANG_LINK }}"
             tar -C kernel_workspace/clang-r563880c -zxf /tmp/clang-r563880c.tar.gz
             rm -f /tmp/clang-r563880c.tar.gz
           else
@@ -94,7 +96,7 @@ jobs:
           if [ "${{ steps.buildtools-cache.outputs.cache-hit }}" != "true" ]; then
             echo "Cache miss — cloning build-tools..."
             git clone --depth=1 -b ks-kernel.lnx.4.0.r1-rel \
-               https://git.codelinaro.org/clo/la/kernel/prebuilts/build-tools.git kernel_workspace/build-tools
+               "${{ env.BUILD_TOOLS_LINK }}" kernel_workspace/build-tools
           else
             echo "build-tools restored from cache, skipping clone."
           fi &
@@ -106,8 +108,8 @@ jobs:
           #echo "Cloning source repository..."
           #git clone --depth=1 https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet -b bka kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
           #git clone --depth=1 "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet" -b Zen-Itsu-Garnet kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
-          #git clone --depth=1 https://github.com/crdroidandroid/android_xiaomi_kernel_garnet -b 16.0 kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
-          git clone --depth=1 https://github.com/zylhdrXP/android_kernel_xiaomi_sm7435 -b lineage-23.2 kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
+          git clone --depth=1 https://github.com/crdroidandroid/android_xiaomi_kernel_garnet -b 16.0 kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
+          #git clone --depth=1 https://github.com/zylhdrXP/android_kernel_xiaomi_sm7435 -b lineage-23.2 kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
           #echo "🌐 Initialize kernel repository..."
           3#mkdir -p android && cd android
           #mkdir -p kernel_workspace && cd kernel_workspace
@@ -293,7 +295,7 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/ldcache_garnet
           
           echo "Downloading config_from_fleurx..."
-          curl -L "${{ env.FLEURX_LINK }}" -o $GITHUB_WORKSPACE/kout/.config
+          curl -L "${{ env.FINAL_CONFIG_LINK }}" -o $GITHUB_WORKSPACE/kout/.config
 
           if [ -s "$GITHUB_WORKSPACE/kout/.config" ]; then
             echo "✅ FleurX config downloaded successfully!"
