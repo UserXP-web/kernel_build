@@ -445,7 +445,7 @@ jobs:
         id: create_zip
         run: |
           cd kernel_workspace
-          git clone https://github.com --depth=1
+          git clone https://github.com/palazik/AnyKernel3 --depth=1
           rm -rf ./AnyKernel3/.git
           cd AnyKernel3
           
