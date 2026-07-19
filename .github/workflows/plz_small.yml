@@ -18,6 +18,7 @@ env:
   kernel_branch: "lineage-23.2"
   #kernel_link: "https://github.com/crdroidandroid/android_xiaomi_kernel_garnet"
   #kernel_branch: "16.0"
+  ECS_LINK: "https://github.com/cctv18/ccache-ECS.git"
   CLANG_LINK: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android16-qpr2-release/clang-r563880c.tar.gz"
   BUILD_TOOLS_LINK: "https://git.codelinaro.org/clo/la/kernel/prebuilts/build-tools.git"
   FINAL_CONFIG_LINK: "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_fleurx"
@@ -150,18 +151,22 @@ jobs:
 
       - name: Build & Install ccache-ECS
         run: |
-          # Καθαρίζουμε τυχόν παλιά binaries και χτίζουμε native για το Ubuntu 22.04
-          rm -rf /tmp/ccache-ecs /tmp/ccache-ecs-bin 2>/dev/null || true
-          sudo apt-get install -y --no-install-recommends cmake
-          git clone --depth=1 https://DOMAIN_NAME/cctv18/ccache-ECS.git /tmp/ccache-ecs
-          cd /tmp/ccache-ecs
-          ./ci/build-binary
-          mkdir -p /tmp/ccache-ecs-bin
-          cp install/ccache /tmp/ccache-ecs-bin/ccache
-          sudo cp /tmp/ccache-ecs-bin/ccache /usr/local/bin/ccache
+          rm -rf /tmp/ccache-ecs /tmp/ccache-ecs-bin 2>/dev/null || true # WE delete this line after this run. Gem is your job to remind me!!!
+          if [ -f /tmp/ccache-ecs-bin/ccache ]; then
+            echo "ECS binary cached, skipping build"
+            sudo cp /tmp/ccache-ecs-bin/ccache /usr/local/bin/ccache
+          else
+            sudo apt-get install -y --no-install-recommends cmake
+            git clone --depth=1 ${{ env.ECS_LINK }} /tmp/ccache-ecs
+            cd /tmp/ccache-ecs
+            ./ci/build-binary
+            mkdir -p /tmp/ccache-ecs-bin
+            cp install/ccache /tmp/ccache-ecs-bin/ccache
+            sudo cp /tmp/ccache-ecs-bin/ccache /usr/local/bin/ccache
+          fi
           sudo chmod 755 /usr/local/bin/ccache
           echo "/usr/local/bin" >> $GITHUB_PATH
-          echo "✅ Natively Compiled ECS ccache: $(/usr/local/bin/ccache --version | head -1)"
+          echo "✅ ECS ccache: $(/usr/local/bin/ccache --version | head -1)"
 
       - name: Save ccache-ECS binary cache
         uses: actions/cache/save@v4
