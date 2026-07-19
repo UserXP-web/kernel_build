@@ -310,20 +310,36 @@ jobs:
           fi
 
       - name: 🛠️ Inject Custom AOSP Modules Fix
-        if: false
+        if: true
         run: |
           CONF="$GITHUB_WORKSPACE/kout/.config"
           
-          # Καθαρισμός προηγούμενων πειραμάτων
+          # 1. Καθαρισμός προηγούμενων DRM & Display εγγραφών
+          sed -i '/CONFIG_DRM_MSM/d' $CONF
+          sed -i '/CONFIG_DRM_PANEL/d' $CONF
           sed -i '/CONFIG_PMIC_GLINK/d' $CONF
-          sed -i '/CONFIG_QCOM_PMIC_GLINK/d' $CONF
+          sed -i '/CONFIG_TYPEC_UCSI/d' $CONF
+          sed -i '/CONFIG_UCSI_PMIC_GLINK/d' $CONF
           
-          # Εισαγωγή του PMIC_GLINK και του απαραίτητου Client Sub-driver ως Modules (=m)
-          echo "CONFIG_PMIC_GLINK=m" >> $CONF
+          # 2. Ενεργοποίηση DRM Master & Panel Mapping για το Garnet
+          echo "CONFIG_DRM_MSM=y" >> $CONF
+          echo "CONFIG_DRM_MSM_REGISTER_LOGGING=y" >> $CONF
+          echo "CONFIG_DRM_PANEL_NOTIFIER=y" >> $CONF
+          
+          # 3. Γεφύρωση του Client 32778 (Display/Type-C)
+          echo "CONFIG_PMIC_GLINK=y" >> $CONF
+          echo "CONFIG_QCOM_PMIC_GLINK=y" >> $CONF
+          echo "CONFIG_TYPEC_UCSI=m" >> $CONF
+          echo "CONFIG_UCSI_PMIC_GLINK=m" >> $CONF
           echo "CONFIG_PMIC_GLINK_ALTMODE=m" >> $CONF
-          echo "CONFIG_QCOM_PMIC_GLINK=m" >> $CONF
           
-          echo "✅ PMIC_GLINK and Client driver injected successfully as Modules!"
+          # 4. Android 16 Bootconfig Alignment
+          sed -i '/CONFIG_BOOT_CONFIG/d' $CONF
+          sed -i '/CONFIG_CMDLINE_BOOTCONFIG/d' $CONF
+          echo "CONFIG_BOOT_CONFIG=y" >> $CONF
+          echo "CONFIG_CMDLINE_BOOTCONFIG=y" >> $CONF
+          
+          echo "✅ DRM Master, Panel Notifier and UCSI Injected!"
 
       - name: 📦 Add build name
         run: |
