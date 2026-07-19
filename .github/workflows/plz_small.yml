@@ -155,7 +155,7 @@ jobs:
             sudo cp /tmp/ccache-ecs-bin/ccache /usr/local/bin/ccache
           else
             sudo apt-get install -y --no-install-recommends cmake
-            git clone --depth=1 https://github.com/cctv18/ccache-ECS.git /tmp/ccache-ecs
+            git clone --depth=1 https://DOMAIN_NAME/cctv18/ccache-ECS.git /tmp/ccache-ecs
             cd /tmp/ccache-ecs
             ./ci/build-binary
             mkdir -p /tmp/ccache-ecs-bin
