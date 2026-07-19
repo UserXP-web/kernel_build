@@ -38,7 +38,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     outputs:
       ak3name: ${{ steps.create_zip.outputs.ak3name }}
     permissions:
@@ -310,19 +310,15 @@ jobs:
           fi
 
       - name: 🛠️ Inject Custom AOSP Modules Fix
-        if: true
+        if: false
         run: |
           CONF="$GITHUB_WORKSPACE/kout/.config"
           
-          # 1. Καθαρισμός προηγούμενων DRM, Display & Modversions εγγραφών
+          # 1. Καθαρισμός προηγούμενων Display εγγραφών (Αφήνουμε τα MODVERSIONS ανέπαφα)
           sed -i '/CONFIG_PMIC_GLINK/d' $CONF
           sed -i '/CONFIG_UCSI_PMIC_GLINK/d' $CONF
-          sed -i '/CONFIG_MODVERSIONS/d' $CONF
-          sed -i '/CONFIG_ASM_MODVERSIONS/d' $CONF
           
-          # 2. Επαναφορά DRM σε "not set" & Απενεργοποίηση Modversions (Παράκαμψη CRC)
-          echo "# CONFIG_MODVERSIONS is not set" >> $CONF
-          echo "# CONFIG_ASM_MODVERSIONS is not set" >> $CONF
+          # 2. Εγχυση του Panel Notifier που λείπει
           echo "CONFIG_DRM_PANEL_NOTIFIER=y" >> $CONF
 
           # 3. Γεφύρωση του Client 32778 (Display/Type-C)
@@ -337,7 +333,7 @@ jobs:
           echo "CONFIG_BOOT_CONFIG=y" >> $CONF
           echo "CONFIG_CMDLINE_BOOTCONFIG=y" >> $CONF
           
-          echo "✅ Modversions Disabled, Panel Notifier and UCSI Injected!"
+          echo "✅ Modversions Kept Native, Panel Notifier and UCSI Injected on Ubuntu 22.04!"
 
       - name: 📦 Add build name
         run: |
