@@ -86,7 +86,7 @@ jobs:
           mkdir -p kernel_workspace/clang-r563880c kernel_workspace/build-tools
 
           sudo apt-get install -y --no-install-recommends -o Dpkg::Use-Pty=0 \
-            libelf-dev dos2unix pahole cmake &
+            libelf-dev dos2unix pahole cmake bc &
 
           # Κατέβασμα Clang στο παρασκήνιο (Background)
           if [ "${{ steps.clang-cache.outputs.cache-hit }}" != "true" ]; then
