@@ -148,11 +148,11 @@ jobs:
         id: ecs-cache
         with:
           path: /tmp/ccache-ecs-bin
-          key: ccache-ecs-${{ runner.os }}-084a7620
+          key: ccache-ecs-${{ runner.os }}-ubuntu22-v2
 
       - name: Build & Install ccache-ECS
         run: |
-          #rm -rf /tmp/ccache-ecs /tmp/ccache-ecs-bin 2>/dev/null || true # WE delete this line after this run. Gem is your job to remind me!!!
+          rm -rf /tmp/ccache-ecs /tmp/ccache-ecs-bin 2>/dev/null || true # WE delete this line after this run. Gem is your job to remind me!!!
           if [ -f /tmp/ccache-ecs-bin/ccache ]; then
             echo "ECS binary cached, skipping build"
             sudo cp /tmp/ccache-ecs-bin/ccache /usr/local/bin/ccache
@@ -174,7 +174,7 @@ jobs:
         if: always()
         with:
           path: /tmp/ccache-ecs-bin
-          key: ccache-ecs-${{ runner.os }}-084a7620
+          key: ccache-ecs-${{ runner.os }}-ubuntu22-v2
 
       - name: Configure CCache Directory
         run: |
