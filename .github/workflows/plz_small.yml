@@ -10,12 +10,12 @@ env:
   KERNEL_VERSION: '5.10'
   KERNEL_NAME: 'kernel_xiaomi_garnet'
   CCACHE_KEY: ccache-garnet-5.10
-  kernel_link: "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet"
-  kernel_branch: "bka"
+  #kernel_link: "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet"
+  #kernel_branch: "bka"
   #kernel_link: "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet"
   #kernel_branch: "Zen-Itsu-Garnet"
-  #kernel_link: "https://github.com/zylhdrXP/android_kernel_xiaomi_sm7435"
-  #kernel_branch: "lineage-23.2"
+  kernel_link: "https://github.com/zylhdrXP/android_kernel_xiaomi_sm7435"
+  kernel_branch: "lineage-23.2"
   #kernel_link: "https://github.com/crdroidandroid/android_xiaomi_kernel_garnet"
   #kernel_branch: "16.0"
   CLANG_LINK: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android16-qpr2-release/clang-r563880c.tar.gz"
@@ -30,7 +30,7 @@ on:
         description: 'LTO Optimization (none = fast compile, thin = default, full = slow)'
         required: true
         type: choice
-        default: 'thin'
+        default: 'full'
         options:
           - 'none'
           - 'thin'
@@ -196,7 +196,7 @@ jobs:
 
       - name: Restore LTO Cache
         uses: actions/cache@v4
-        if: inputs.lto_type == 'thin'
+        if: inputs.lto_type == 'full'
         with:
           path: ${{ env.LDCACHE_DIR }}
           key: lto-cache-${{ runner.os }}-${{ github.ref_name }}-${{ github.run_id }}
@@ -352,7 +352,7 @@ jobs:
           cd kernel_workspace/common
 
           echo '#!/bin/bash' > ld-wrapper
-          echo 'ld.lld "$@" --thinlto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --thinlto-jobs=2' >> ld-wrapper
+          echo 'ld.lld "$@" --lto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --lto-partitions=4' >> ld-wrapper
           chmod +x ld-wrapper
 
           export CC="ccache clang"
@@ -431,7 +431,7 @@ jobs:
           key: ccache-garnet-5.10-${{ runner.os }}-${{ github.ref_name }}-${{ github.run_id }}
 
       - name: 📦 Save LTO CCache
-        if: success() && inputs.lto_type == 'thin'
+        if: success() && inputs.lto_type == 'full'
         uses: actions/cache/save@v4
         with:
           path: ${{ env.LDCACHE_DIR }}
