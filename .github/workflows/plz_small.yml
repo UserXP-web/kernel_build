@@ -321,11 +321,11 @@ jobs:
           sed -i '/CONFIG_TYPEC_UCSI/d' $CONF
           sed -i '/CONFIG_UCSI_PMIC_GLINK/d' $CONF
           
-          # 2. Ενεργοποίηση DRM Master & Panel Mapping για το Garnet
-          echo "CONFIG_DRM_MSM=y" >> $CONF
+          # 2. Ασφαλής Ενεργοποίηση DRM ως Module (Αποφυγή Instant Reboot)
+          echo "CONFIG_DRM_MSM=m" >> $CONF
           echo "CONFIG_DRM_MSM_REGISTER_LOGGING=y" >> $CONF
           echo "CONFIG_DRM_PANEL_NOTIFIER=y" >> $CONF
-          
+
           # 3. Γεφύρωση του Client 32778 (Display/Type-C)
           echo "CONFIG_PMIC_GLINK=y" >> $CONF
           echo "CONFIG_QCOM_PMIC_GLINK=y" >> $CONF
@@ -351,9 +351,9 @@ jobs:
           
           if [ -f "$GITHUB_WORKSPACE/kout/.config" ]; then
             sed -i '/CONFIG_LOCALVERSION=/d' $GITHUB_WORKSPACE/kout/.config
-            sed -i '/CONFIG_LOCALVERSION_AUTO=/d' $GITHUB_WORKSPACE/kout/.config
-            echo 'CONFIG_LOCALVERSION="-palaziks-ShiftPorts"' >> $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_LOCALVERSION_AUTO=n" >> $GITHUB_WORKSPACE/kout/.config
+            #sed -i '/CONFIG_LOCALVERSION_AUTO=/d' $GITHUB_WORKSPACE/kout/.config
+            echo 'CONFIG_LOCALVERSION="-FleurX"' >> $GITHUB_WORKSPACE/kout/.config
+            #echo "CONFIG_LOCALVERSION_AUTO=n" >> $GITHUB_WORKSPACE/kout/.config
           fi
 
       - name: 🔨 Build Kernel
