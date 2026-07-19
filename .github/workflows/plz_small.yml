@@ -3,6 +3,7 @@ name: 🚀⚡ Kernel AOSP Garnet Build
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-5.10-garnet
   cancel-in-progress: true
+  # https://github.com/Neutron-Toolchains/clang-build-catalogue
 
 env:
   TZ: Europe/Athens
@@ -151,7 +152,7 @@ jobs:
 
       - name: Build & Install ccache-ECS
         run: |
-          rm -rf /tmp/ccache-ecs /tmp/ccache-ecs-bin 2>/dev/null || true # WE delete this line after this run. Gem is your job to remind me!!!
+          #rm -rf /tmp/ccache-ecs /tmp/ccache-ecs-bin 2>/dev/null || true # WE delete this line after this run. Gem is your job to remind me!!!
           if [ -f /tmp/ccache-ecs-bin/ccache ]; then
             echo "ECS binary cached, skipping build"
             sudo cp /tmp/ccache-ecs-bin/ccache /usr/local/bin/ccache
@@ -312,30 +313,25 @@ jobs:
           fi
 
       - name: 🛠️ Inject Custom AOSP Modules Fix
-        if: false
+        if: true
         run: |
           CONF="$GITHUB_WORKSPACE/kout/.config"
           
-          # 1. Καθαρισμός προηγούμενων Display εγγραφών (Αφήνουμε τα MODVERSIONS ανέπαφα)
-          sed -i '/CONFIG_PMIC_GLINK/d' $CONF
-          sed -i '/CONFIG_UCSI_PMIC_GLINK/d' $CONF
+          # 1. Καθαρισμός προηγούμενων Display εγγραφών
+          sed -i '/CONFIG_DRM_MSM/d' $CONF
+          sed -i '/CONFIG_DRM_PANEL/d' $CONF
           
-          # 2. Εγχυση του Panel Notifier που λείπει
+          # 2. Στατική ενεργοποίηση του Display Driver & Panel Notifier
+          echo "CONFIG_DRM_MSM=y" >> $CONF
           echo "CONFIG_DRM_PANEL_NOTIFIER=y" >> $CONF
 
-          # 3. Γεφύρωση του Client 32778 (Display/Type-C)
-          echo "CONFIG_PMIC_GLINK=y" >> $CONF
-          echo "CONFIG_QCOM_PMIC_GLINK=y" >> $CONF
-          echo "CONFIG_UCSI_PMIC_GLINK=m" >> $CONF
-          echo "CONFIG_PMIC_GLINK_ALTMODE=m" >> $CONF
-          
-          # 4. Android 16 Bootconfig Alignment
+          # 3. Android 16 Bootconfig Alignment
           sed -i '/CONFIG_BOOT_CONFIG/d' $CONF
           sed -i '/CONFIG_CMDLINE_BOOTCONFIG/d' $CONF
           echo "CONFIG_BOOT_CONFIG=y" >> $CONF
           echo "CONFIG_CMDLINE_BOOTCONFIG=y" >> $CONF
           
-          echo "✅ Modversions Kept Native, Panel Notifier and UCSI Injected on Ubuntu 22.04!"
+          echo "✅ Static DRM MSM and Panel Notifier Injected!"
 
       - name: 📦 Add build name
         run: |
