@@ -314,22 +314,20 @@ jobs:
         run: |
           CONF="$GITHUB_WORKSPACE/kout/.config"
           
-          # 1. Καθαρισμός προηγούμενων DRM & Display εγγραφών
-          sed -i '/CONFIG_DRM_MSM/d' $CONF
-          sed -i '/CONFIG_DRM_PANEL/d' $CONF
+          # 1. Καθαρισμός προηγούμενων DRM, Display & Modversions εγγραφών
           sed -i '/CONFIG_PMIC_GLINK/d' $CONF
-          sed -i '/CONFIG_TYPEC_UCSI/d' $CONF
           sed -i '/CONFIG_UCSI_PMIC_GLINK/d' $CONF
+          sed -i '/CONFIG_MODVERSIONS/d' $CONF
+          sed -i '/CONFIG_ASM_MODVERSIONS/d' $CONF
           
-          # 2. Ασφαλής Ενεργοποίηση DRM ως Module (Αποφυγή Instant Reboot)
-          echo "CONFIG_DRM_MSM=m" >> $CONF
-          echo "CONFIG_DRM_MSM_REGISTER_LOGGING=y" >> $CONF
+          # 2. Επαναφορά DRM σε "not set" & Απενεργοποίηση Modversions (Παράκαμψη CRC)
+          echo "# CONFIG_MODVERSIONS is not set" >> $CONF
+          echo "# CONFIG_ASM_MODVERSIONS is not set" >> $CONF
           echo "CONFIG_DRM_PANEL_NOTIFIER=y" >> $CONF
 
           # 3. Γεφύρωση του Client 32778 (Display/Type-C)
           echo "CONFIG_PMIC_GLINK=y" >> $CONF
           echo "CONFIG_QCOM_PMIC_GLINK=y" >> $CONF
-          echo "CONFIG_TYPEC_UCSI=m" >> $CONF
           echo "CONFIG_UCSI_PMIC_GLINK=m" >> $CONF
           echo "CONFIG_PMIC_GLINK_ALTMODE=m" >> $CONF
           
@@ -339,7 +337,7 @@ jobs:
           echo "CONFIG_BOOT_CONFIG=y" >> $CONF
           echo "CONFIG_CMDLINE_BOOTCONFIG=y" >> $CONF
           
-          echo "✅ DRM Master, Panel Notifier and UCSI Injected!"
+          echo "✅ Modversions Disabled, Panel Notifier and UCSI Injected!"
 
       - name: 📦 Add build name
         run: |
