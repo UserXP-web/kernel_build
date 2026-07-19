@@ -150,21 +150,18 @@ jobs:
 
       - name: Build & Install ccache-ECS
         run: |
-          if [ -f /tmp/ccache-ecs-bin/ccache ]; then
-            echo "ECS binary cached, skipping build"
-            sudo cp /tmp/ccache-ecs-bin/ccache /usr/local/bin/ccache
-          else
-            sudo apt-get install -y --no-install-recommends cmake
-            git clone --depth=1 https://DOMAIN_NAME/cctv18/ccache-ECS.git /tmp/ccache-ecs
-            cd /tmp/ccache-ecs
-            ./ci/build-binary
-            mkdir -p /tmp/ccache-ecs-bin
-            cp install/ccache /tmp/ccache-ecs-bin/ccache
-            sudo cp /tmp/ccache-ecs-bin/ccache /usr/local/bin/ccache
-          fi
+          # Καθαρίζουμε τυχόν παλιά binaries και χτίζουμε native για το Ubuntu 22.04
+          rm -rf /tmp/ccache-ecs /tmp/ccache-ecs-bin 2>/dev/null || true
+          sudo apt-get install -y --no-install-recommends cmake
+          git clone --depth=1 https://DOMAIN_NAME/cctv18/ccache-ECS.git /tmp/ccache-ecs
+          cd /tmp/ccache-ecs
+          ./ci/build-binary
+          mkdir -p /tmp/ccache-ecs-bin
+          cp install/ccache /tmp/ccache-ecs-bin/ccache
+          sudo cp /tmp/ccache-ecs-bin/ccache /usr/local/bin/ccache
           sudo chmod 755 /usr/local/bin/ccache
           echo "/usr/local/bin" >> $GITHUB_PATH
-          echo "✅ ECS ccache: $(/usr/local/bin/ccache --version | head -1)"
+          echo "✅ Natively Compiled ECS ccache: $(/usr/local/bin/ccache --version | head -1)"
 
       - name: Save ccache-ECS binary cache
         uses: actions/cache/save@v4
