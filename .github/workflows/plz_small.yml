@@ -12,16 +12,18 @@ env:
   KERNEL_VERSION: '5.10'
   KERNEL_NAME: 'kernel_xiaomi_garnet'
   CCACHE_KEY: ccache-garnet-5.10
-  #kernel_link: "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet"
-  #kernel_branch: "bka"
+  kernel_link: "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet"
+  kernel_branch: "bka"
   #kernel_link: "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet"
   #kernel_branch: "Zen-Itsu-Garnet"
-  kernel_link: "https://github.com/zylhdrXP/android_kernel_xiaomi_sm7435"
-  kernel_branch: "lineage-23.2"
+  #kernel_link: "https://github.com/zylhdrXP/android_kernel_xiaomi_sm7435"
+  #kernel_branch: "lineage-23.2"
   #kernel_link: "https://github.com/crdroidandroid/android_xiaomi_kernel_garnet"
   #kernel_branch: "16.0"
-  ECS_LINK: "https://github.com/cctv18/ccache-ECS.git"
-  CLANG_LINK: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android16-qpr2-release/clang-r563880c.tar.gz"
+  ECS_LINK: "https://github.com/cctv18/ccache-ECS.git"  
+  CLANG_VERSION: "r584948" # "r563880c" # "r584948" ### NEW_CLANG_LINK="${CLANG_LINK/\{CLANG_VERSION\}/$CLANG_VERSION}"
+  #CLANG_LINK: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android16-qpr2-release/clang-r563880c.tar.gz"  
+  CLANG_LINK: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/167e11df8c330bced88cdf5808f61f41d9eab330/clang-r584948.tar.gz"
   BUILD_TOOLS_LINK: "https://git.codelinaro.org/clo/la/kernel/prebuilts/build-tools.git"
   FINAL_CONFIG_LINK: "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_fleurx"
   AK3_LINK: "https://github.com/palazik/AnyKernel3"
@@ -71,8 +73,8 @@ jobs:
         id: clang-cache
         uses: actions/cache@v4
         with:
-          path: kernel_workspace/clang-r563880c
-          key: Linux-aosp-clang-clang-r563880c
+          path: kernel_workspace/clang-${{ env.CLANG_VERSION }}
+          key: Linux-aosp-clang-clang-${{ env.CLANG_VERSION }}
 
       - name: Cache build-tools
         id: buildtools-cache
@@ -85,20 +87,21 @@ jobs:
         run: |
           # Καθαρισμός φακέλων εργασίας πριν ξεκινήσει το κατέβασμα
           rm -rf kernel_workspace/common kernel_workspace/out 2>/dev/null || true
-          mkdir -p kernel_workspace/clang-r563880c kernel_workspace/build-tools
+          mkdir -p kernel_workspace/clang-${{ env.CLANG_VERSION }} kernel_workspace/build-tools
 
           sudo apt-get install -y --no-install-recommends -o Dpkg::Use-Pty=0 \
             libelf-dev dos2unix pahole cmake bc &
 
           # Κατέβασμα Clang στο παρασκήνιο (Background)
           if [ "${{ steps.clang-cache.outputs.cache-hit }}" != "true" ]; then
-            echo "Cache miss — downloading clang-r563880c..."
-            mkdir -p kernel_workspace/clang-r563880c
+            set -e # stop in 1st error            
+            echo "Cache miss — downloading clang-${{ env.CLANG_VERSION }}..."
+            mkdir -p kernel_workspace/clang-${{ env.CLANG_VERSION }}
             aria2c -x16 -s16 -k1M -j16 --retry-wait=5 --max-tries=10 \
-              -d /tmp -o clang-r563880c.tar.gz \
+              -d /tmp -o clang-${{ env.CLANG_VERSION }}.tar.gz \
               "${{ env.CLANG_LINK }}"
-            tar -C kernel_workspace/clang-r563880c -zxf /tmp/clang-r563880c.tar.gz
-            rm -f /tmp/clang-r563880c.tar.gz
+            tar -C kernel_workspace/clang-${{ env.CLANG_VERSION }} -zxf /tmp/clang-${{ env.CLANG_VERSION }}.tar.gz
+            rm -f /tmp/clang-${{ env.CLANG_VERSION }}.tar.gz
           else
             echo "Clang restored from cache, skipping download."
           fi &
@@ -347,7 +350,7 @@ jobs:
         run: |
           WORKDIR="$(pwd)"
           export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
-          export PATH="$WORKDIR/kernel_workspace/clang-r563880c/bin:$WORKDIR/kernel_workspace/build-tools/linux-x86/bin:$PATH"
+          export PATH="$WORKDIR/kernel_workspace/clang-${{ env.CLANG_VERSION }}/bin:$WORKDIR/kernel_workspace/build-tools/linux-x86/bin:$PATH"
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
           export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
           export CCACHE_IS_KERNEL_COMPILING=true
@@ -387,7 +390,7 @@ jobs:
           WORKDIR="$(pwd)"
           export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
           
-          export PATH="$WORKDIR/kernel_workspace/clang-r563880c/bin:$WORKDIR/kernel_workspace/build-tools/linux-x86/bin:$PATH"
+          export PATH="$WORKDIR/kernel_workspace/clang-${{ env.CLANG_VERSION }}/bin:$WORKDIR/kernel_workspace/build-tools/linux-x86/bin:$PATH"
           
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
           export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
