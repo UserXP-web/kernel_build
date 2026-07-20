@@ -320,7 +320,7 @@ jobs:
             exit 1
           fi
 
-      - name: 🛠️ Inject Universal AOSP & AxionOS Fix
+      - name: 🛠️ Inject Universal AOSP & AxionOS Fix (Try 1.295)
         if: true
         run: |
           CONF="$GITHUB_WORKSPACE/kout/.config"
@@ -332,22 +332,21 @@ jobs:
           echo "CONFIG_BOOT_CONFIG=y" >> $CONF
           echo "CONFIG_CMDLINE_BOOTCONFIG=y" >> $CONF
           
-          # 2. Κλείδωμα DRM Panel & Generic DRM Flags (Όπως ο FleurX)
+          # 2. Κλείδωμα DRM Panel & Generic DRM Flags
           sed -i '/CONFIG_DRM_PANEL/d' $CONF
-          sed -i '/CONFIG_DRM_PANEL_ORIENTATION_QUIRKS/d' $CONF
           echo "CONFIG_DRM_PANEL=y" >> $CONF
-          echo "CONFIG_DRM_PANEL_ORIENTATION_QUIRKS=y" >> $CONF
           
-          # 3. SOURCE PATCHING: Εξαναγκασμός του Touch Driver να κάνει compile το DRM Panel Bridge
-          # Ψάχνουμε το Kconfig του touchscreen driver για να του επιβάλλουμε το DRM dependency
-          find $SRC/drivers/input/touchscreen/ -name "Kconfig" -exec sed -i 's/depends on DRM_MSM/depends on DRM/g' {} +
-          find $SRC/drivers/input/touchscreen/ -name "Kconfig" -exec sed -i 's/select DRM_MSM/select DRM_PANEL/g' {} +
-          
-          # 4. Απενεργοποίηση ARMv8.3 Pointer Authentication για σταθερότητα στα hooks
+          # 3. HACKER CODE BYPASS: Εξαναγκασμός του fts_notifier να επιστρέφει επιτυχία (0) ακόμα και αν το drm_panel είναι NULL
+          # Παρακάμπτουμε το "init notifier callback fail" που βλέπουμε στο logcat
+          find $SRC/drivers/input/touchscreen/ -name "*fts*notifier*.c" -exec sed -i 's/return -ENODEV;/return 0;/g' {} +
+          find $SRC/drivers/input/touchscreen/ -name "*fts*notifier*.c" -exec sed -i 's/return rc;/return 0;/g' {} +
+          find $SRC/drivers/input/touchscreen/ -name "*fts*probe*.c" -exec sed -i 's/goto .*fail.*/return 0;/g' {} +
+
+          # 4. Απενεργοποίηση ARMv8.3 Pointer Authentication
           sed -i '/CONFIG_ARM64_PTR_AUTH/d' $CONF
           echo "# CONFIG_ARM64_PTR_AUTH is not set" >> $CONF
           
-          echo "✅ Universal AxionOS/AOSP patches injected successfully!"
+          echo "✅ Try 1.295 Direct Code Injections applied!"
 
       - name: 📦 Add build name
         run: |
