@@ -25,7 +25,8 @@ env:
   #CLANG_LINK: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android16-qpr2-release/clang-r563880c.tar.gz"  
   CLANG_LINK: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/167e11df8c330bced88cdf5808f61f41d9eab330/clang-r584948.tar.gz"
   BUILD_TOOLS_LINK: "https://git.codelinaro.org/clo/la/kernel/prebuilts/build-tools.git"
-  FINAL_CONFIG_LINK: "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_fleurx"
+  #FINAL_CONFIG_LINK: "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_fleurx"
+  FINAL_CONFIG_LINK: "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_EvoX_a17"
   AK3_LINK: "https://github.com/palazik/AnyKernel3"
 
 on:
@@ -63,11 +64,14 @@ jobs:
 
       - name: 🧠 Add swap space (Optimized for LTO link)
         run: |
-          sudo fallocate -l 10G /mnt/swap_lto || sudo dd if=/dev/zero of=/mnt/swap_lto bs=1M count=10240
+          # Αυξάνουμε το Swap στα 16G για να αντέξει το Linker του EvoX Config
+          sudo swapoff /mnt/swap_lto 2>/dev/null || true
+          sudo rm -f /mnt/swap_lto
+          sudo fallocate -l 16G /mnt/swap_lto || sudo dd if=/dev/zero of=/mnt/swap_lto bs=1M count=16384
           sudo chmod 600 /mnt/swap_lto
           sudo mkswap /mnt/swap_lto
           sudo swapon /mnt/swap_lto
-          echo "── swap after ──"; free -h
+          echo "── swap after upgrade ──"; free -h
 
       - name: Cache Clang
         id: clang-cache
@@ -321,15 +325,21 @@ jobs:
         run: |
           CONF="$GITHUB_WORKSPACE/kout/.config"
           
-          # 1. Καθαρισμός και ευθυγράμμιση με το αυθεντικό FleurX Config
+          # 1. Εξασφάλιση Bootconfig για Android 16/17 Init
           sed -i '/CONFIG_BOOT_CONFIG/d' $CONF
           sed -i '/CONFIG_CMDLINE_BOOTCONFIG/d' $CONF
-          
-          # 2. Ενεργοποιούμε ΜΟΝΟ τα απαραίτητα flags για το Android 16 Bootconfig
           echo "CONFIG_BOOT_CONFIG=y" >> $CONF
           echo "CONFIG_CMDLINE_BOOTCONFIG=y" >> $CONF
           
-          echo "✅ Config aligned 100% with native FleurX properties!"
+          # 2. Απενεργοποίηση ARMv8.3 Pointer Authentication (Αποτρέπει Null Pointer Dereferences σε display/touch hooks)
+          sed -i '/CONFIG_ARM64_PTR_AUTH/d' $CONF
+          echo "# CONFIG_ARM64_PTR_AUTH is not set" >> $CONF
+          
+          # 3. Κλείδωμα Page Size στα 4K (Ευθυγράμμιση με τη ROM)
+          sed -i '/CONFIG_ARM64_4K_PAGES/d' $CONF
+          echo "CONFIG_ARM64_4K_PAGES=y" >> $CONF
+          
+          echo "✅ Config aligned 100% with native EvoX A17 requirements!"
 
       - name: 📦 Add build name
         run: |
@@ -358,7 +368,8 @@ jobs:
           cd kernel_workspace/common
 
           echo '#!/bin/bash' > ld-wrapper
-          echo 'ld.lld "$@" --lto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --lto-partitions=4' >> ld-wrapper
+          # Περιορίζουμε τα LTO partitions σε 2 για να μειώσουμε το RAM spikes
+          echo 'ld.lld "$@" --lto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --lto-partitions=2' >> ld-wrapper
           chmod +x ld-wrapper
 
           export CC="ccache clang"
