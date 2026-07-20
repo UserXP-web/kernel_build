@@ -320,10 +320,11 @@ jobs:
             exit 1
           fi
 
-      - name: 🛠️ Inject Custom AOSP Modules Fix
+      - name: 🛠️ Inject Universal AOSP & AxionOS Fix
         if: true
         run: |
           CONF="$GITHUB_WORKSPACE/kout/.config"
+          SRC="kernel_workspace/common"
           
           # 1. Εξασφάλιση Bootconfig για Android 16/17 Init
           sed -i '/CONFIG_BOOT_CONFIG/d' $CONF
@@ -331,15 +332,22 @@ jobs:
           echo "CONFIG_BOOT_CONFIG=y" >> $CONF
           echo "CONFIG_CMDLINE_BOOTCONFIG=y" >> $CONF
           
-          # 2. Απενεργοποίηση ARMv8.3 Pointer Authentication (Αποτρέπει Null Pointer Dereferences σε display/touch hooks)
+          # 2. Κλείδωμα DRM Panel & Generic DRM Flags (Όπως ο FleurX)
+          sed -i '/CONFIG_DRM_PANEL/d' $CONF
+          sed -i '/CONFIG_DRM_PANEL_ORIENTATION_QUIRKS/d' $CONF
+          echo "CONFIG_DRM_PANEL=y" >> $CONF
+          echo "CONFIG_DRM_PANEL_ORIENTATION_QUIRKS=y" >> $CONF
+          
+          # 3. SOURCE PATCHING: Εξαναγκασμός του Touch Driver να κάνει compile το DRM Panel Bridge
+          # Ψάχνουμε το Kconfig του touchscreen driver για να του επιβάλλουμε το DRM dependency
+          find $SRC/drivers/input/touchscreen/ -name "Kconfig" -exec sed -i 's/depends on DRM_MSM/depends on DRM/g' {} +
+          find $SRC/drivers/input/touchscreen/ -name "Kconfig" -exec sed -i 's/select DRM_MSM/select DRM_PANEL/g' {} +
+          
+          # 4. Απενεργοποίηση ARMv8.3 Pointer Authentication για σταθερότητα στα hooks
           sed -i '/CONFIG_ARM64_PTR_AUTH/d' $CONF
           echo "# CONFIG_ARM64_PTR_AUTH is not set" >> $CONF
           
-          # 3. Κλείδωμα Page Size στα 4K (Ευθυγράμμιση με τη ROM)
-          sed -i '/CONFIG_ARM64_4K_PAGES/d' $CONF
-          echo "CONFIG_ARM64_4K_PAGES=y" >> $CONF
-          
-          echo "✅ Config aligned 100% with native EvoX A17 requirements!"
+          echo "✅ Universal AxionOS/AOSP patches injected successfully!"
 
       - name: 📦 Add build name
         run: |
