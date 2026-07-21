@@ -96,7 +96,7 @@ jobs:
       - name: 📥 Install dependencies & Init Source
         run: |
           # Καθαρισμός φακέλων εργασίας πριν ξεκινήσει το κατέβασμα
-          rm -rf kernel/xiaomi/sm7435 kernel_workspace/out 2>/dev/null || true
+          rm -rf sm7435 kernel_workspace/out 2>/dev/null || true
           mkdir -p kernel_workspace/clang-${{ env.CLANG_VERSION }} kernel_workspace/build-tools
 
           sudo apt-get install -y --no-install-recommends -o Dpkg::Use-Pty=0 \
@@ -130,8 +130,8 @@ jobs:
 
           # ΕΚΤΕΛΕΣΗ CLONE ΣΤΟ ΠΡΟΣΚΗΝΙΟ (Foreground) για άμεση καταγραφή σφαλμάτων
           echo "Cloning source repository..."
-          mkdir -p kernel/xiaomi
-          git clone --depth=1 "${{env.kernel_link }}" -b ${{ env.kernel_branch }} kernel/xiaomi/sm7435 || { echo "❌ ERROR: Git clone failed!"; exit 1; }
+          #mkdir -p kernel/xiaomi
+          git clone --depth=1 "${{env.kernel_link }}" -b ${{ env.kernel_branch }} sm7435 || { echo "❌ ERROR: Git clone failed!"; exit 1; }
           
           #echo "🌐 Initialize kernel repository..."
           #mkdir -p android && cd android
@@ -147,9 +147,9 @@ jobs:
           #cd $GITHUB_WORKSPACE
 
           echo "Removing ABI protection & dirty suffix..."
-          rm kernel/xiaomi/sm7435/abi_gki_protected_exports_* 2>/dev/null || true
-          rm kernel/xiaomi/sm7435/android/abi_gki_protected_exports_* 2>/dev/null || true
-          for f in kernel/xiaomi/sm7435/scripts/setlocalversion; do
+          rm sm7435/abi_gki_protected_exports_* 2>/dev/null || true
+          rm sm7435/android/abi_gki_protected_exports_* 2>/dev/null || true
+          for f in sm7435/scripts/setlocalversion; do
             if [ -f "$f" ]; then
               sed -i 's/ -dirty//g' "$f"
               sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' "$f"
@@ -161,19 +161,21 @@ jobs:
       - name: 📺 Clone & Patch Custom Xiaomi Modules
         run: |
           echo "Pre-cloning custom Xiaomi sm7435-modules to bypass generic drivers..."
-          rm -rf kernel/xiaomi/sm7435-modules 2>/dev/null || true
-          git clone --depth=1 "${{ env.kernel_modules_link }}" -b ${{ env.kernel_modules_branch }} kernel/xiaomi/sm7435-modules
-          echo "✅ Modules aligned at kernel/xiaomi/sm7435-modules!"
+          rm -rf sm7435-modules 2>/dev/null || true
+          git clone --depth=1 "${{ env.kernel_modules_link }}" -b ${{ env.kernel_modules_branch }} sm7435-modules
+          echo "✅ Modules aligned at sm7435-modules!"
 
-          #echo "🛠️ Injecting Null-Pointer & 🔓 Garbage Data Bypasses..."
-          ## 1. Εξαναγκασμός του panel parsing να μην επιστρέφει PTR_ERR
-          #find kernel/xiaomi/sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/return PTR_ERR(prim_panel);/return 0;/g' {} +
-          #find kernel/xiaomi/sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/if (IS_ERR_OR_NULL(prim_panel))/if (0)/g' {} +
-          #find kernel/xiaomi/sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/if (!prim_panel)/if (0)/g' {} +
-          ## 2. Force drop του DRM Master instance για να σπάσει το userspace lock
-          #find kernel/xiaomi/sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/if (!drm_is_current_master/if (0 \&\& !drm_is_current_master/g' {} +
-          #find kernel/xiaomi/sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/ret = drm_setmaster_ioctl/ret = 0; \/\/ drm_setmaster_ioctl/g' {} +
-          #find kernel/xiaomi/sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/return -EPERM;/return 0;/g' {} +
+          echo "🛠️ Injecting Null-Pointer & Garbage Data Bypasses (Try 1.304)..."
+          # 1. Παράκαμψη του NULL crash και εξαναγκασμός επιστροφής επιτυχίας στο panel registration
+          find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/return PTR_ERR(prim_panel);/return 0;/g' {} +
+          find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/if (IS_ERR_OR_NULL(prim_panel))/if (0)/g' {} +
+          find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/if (!prim_panel)/if (0)/g' {} +
+          find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/if (PTR_ERR(prim_panel))/if (0)/g' {} +
+          # 2. Force drop του DRM Master Verification Lock
+          find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/if (!drm_is_current_master/if (0 \&\& !drm_is_current_master/g' {} +
+          find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/ret = drm_setmaster_ioctl/ret = 0; \/\/ drm_setmaster_ioctl/g' {} +
+          find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/return -EPERM;/return 0;/g' {} +
+
 
       - name: Cache ccache-ECS binary
         uses: actions/cache@v4
@@ -283,7 +285,7 @@ jobs:
       - name: 🧩 Merge and Configure Defconfigs
         if: false
         run: |
-          cd kernel/xiaomi/sm7435
+          cd sm7435
           
           # 1. Βασικές ρυθμίσεις απόδοσης
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> arch/arm64/configs/gki_defconfig
@@ -346,7 +348,7 @@ jobs:
 
       - name: 📦 Add build name
         run: |
-          cd kernel/xiaomi/sm7435
+          cd sm7435
           
           if [ -f "scripts/setlocalversion" ]; then
             sed -i 's/${scm_version}//' scripts/setlocalversion
@@ -368,7 +370,7 @@ jobs:
           export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
           export CCACHE_IS_KERNEL_COMPILING=true
 
-          cd $GITHUB_WORKSPACE/kernel/xiaomi/sm7435
+          cd $GITHUB_WORKSPACE/sm7435
 
           echo '#!/bin/bash' > ld-wrapper
           # Περιορίζουμε τα LTO partitions σε 2 για να μειώσουμε το RAM spikes
