@@ -162,6 +162,12 @@ jobs:
           git clone --depth=1 "${{env.kernel_modules_link }}" -b ${{ env.kernel_modules_branch }} sm7435-modules          
           echo "✅ Clean Xiaomi modules injected at the workspace root folder!"
 
+          echo "🔓 Applying DRM Master Drop-Force Patches..."
+          # DRM Master Verification Bypass (Bypass the lock from HyperOS vendor blobs)
+          find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/if (!drm_is_current_master/if (0 \&\& !drm_is_current_master/g' {} +
+          find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/ret = drm_setmaster_ioctl/ret = 0; \/\/ drm_setmaster_ioctl/g' {} +
+          find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/return -EPERM;/return 0;/g' {} +
+
       - name: Cache ccache-ECS binary
         uses: actions/cache@v4
         id: ecs-cache
@@ -385,51 +391,6 @@ jobs:
 
           echo "Kernel Compilation Complete!"
 
-      - name: 🔨 Build Kernel (old)
-        if: false
-        run: |
-          WORKDIR="$(pwd)"
-          export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
-          
-          export PATH="$WORKDIR/kernel_workspace/clang-${{ env.CLANG_VERSION }}/bin:$WORKDIR/kernel_workspace/build-tools/linux-x86/bin:$PATH"
-          
-          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
-          export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
-          export CCACHE_IS_KERNEL_COMPILING=true
-
-          mkdir -p $GITHUB_WORKSPACE/kout
-          mkdir -p $GITHUB_WORKSPACE/ldcache_garnet
-
-          # Χρήση του αποτελέσματος του merge_config
-          cp $WORKDIR/kernel_workspace/out/.config $GITHUB_WORKSPACE/kout/.config
-
-          cd kernel/xiaomi/sm7435
-
-          echo '#!/bin/bash' > ld-wrapper
-          echo 'ld.lld "$@" --thinlto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --thinlto-jobs=$(($(nproc --all) / 2))' >> ld-wrapper
-          chmod +x ld-wrapper
-
-          # 1. Εκτέλεση olddefconfig
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
-            CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD="$(pwd)/ld-wrapper" \
-            O=$GITHUB_WORKSPACE/kout \
-            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
-            olddefconfig
-
-          # 2. Μεταγλώττιση του Image
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
-            CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD="$(pwd)/ld-wrapper" \
-            O=$GITHUB_WORKSPACE/kout \
-            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
-            KCFLAGS="-O2 -pipe -Wno-error -Wno-implicit-function-declaration -Wno-implicit-int -Wno-default-const-init-var-unsafe -Wno-format -Wno-unknown-warning-option ${MAP}" \
-            Image
-
-          echo "Kernel Compilation Complete!"
-          ccache -c
-          ccache --evict-older-than 10800s
-          ccache -s
-          df -h
-
       - name: 📦 Save New CCache
         if: success()
         uses: actions/cache/save@v4
@@ -453,7 +414,7 @@ jobs:
           rm -rf AnyKernel3/.git
           cd AnyKernel3
           # Αντιγραφή του Kernel Image
-          cp $GITHUB_WORKSPACE/kout/arch/arm64/boot/Image ./Image
+          cp $GITHUB_WORKSPACE/kout/arch/arm64/boot/Image kernel_workspace/AnyKernel3/
           
           ## [ΤΟ ΣΩΣΤΟ PATCH]: Ρίχνουμε τα 301 modules χύμα στον κεντρικό φάκελο modules/
           #mkdir -p ./modules
