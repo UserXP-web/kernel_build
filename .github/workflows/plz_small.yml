@@ -28,8 +28,8 @@ env:
   CLANG_VERSION: "r584948"
   CLANG_LINK: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/167e11df8c330bced88cdf5808f61f41d9eab330/clang-r584948.tar.gz"
   BUILD_TOOLS_LINK: "https://git.codelinaro.org/clo/la/kernel/prebuilts/build-tools.git"
-  #FINAL_CONFIG_LINK: "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_fleurx"
-  FINAL_CONFIG_LINK: "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_EvoX_a17"
+  FINAL_CONFIG_LINK: "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_fleurx"
+  #FINAL_CONFIG_LINK: "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_EvoX_a17"
   AK3_LINK: "https://github.com/palazik/AnyKernel3"
 
 on:
