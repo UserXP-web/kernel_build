@@ -1,0 +1,486 @@
+name: 🚀⚡ Kernel Build Garnet EvoX 12.0 - Android 17
+# Build and boot EvoX 12.0 - Android 17
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-5.10-garnet
+  cancel-in-progress: true
+  # https://github.com/Neutron-Toolchains/clang-build-catalogue
+  # https://github.com/zylhdrXP/android_kernel_common-5.10
+
+env:
+  TZ: Europe/Athens
+  ANDROID_VERSION: 'android14'
+  KERNEL_VERSION: '5.10'
+  KERNEL_NAME: 'kernel_xiaomi_garnet'
+  CCACHE_KEY: ccache-garnet-5.10
+  #kernel_link: "https://github.com/Evolution-X-Devices/kernel_xiaomi_garnet"
+  #kernel_branch: "bka"
+  #kernel_link: "https://github.com/UserXP-web/Zen-ItsuKernel-Garnet"
+  #kernel_branch: "Zen-Itsu-Garnet"
+  kernel_link: "https://github.com/zylhdrXP/android_kernel_xiaomi_sm7435"
+  kernel_branch: "lineage-23.2"
+  #kernel_link: "https://github.com/crdroidandroid/android_xiaomi_kernel_garnet"
+  #kernel_branch: "16.0"
+  ECS_LINK: "https://github.com/cctv18/ccache-ECS.git"  
+  CLANG_VERSION: "r584948" # "r563880c" # "r584948" ### NEW_CLANG_LINK="${CLANG_LINK/\{CLANG_VERSION\}/$CLANG_VERSION}"
+  #CLANG_LINK: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android16-qpr2-release/clang-r563880c.tar.gz"  
+  CLANG_LINK: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/167e11df8c330bced88cdf5808f61f41d9eab330/clang-r584948.tar.gz"
+  BUILD_TOOLS_LINK: "https://git.codelinaro.org/clo/la/kernel/prebuilts/build-tools.git"
+  #FINAL_CONFIG_LINK: "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_fleurx"
+  FINAL_CONFIG_LINK: "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_EvoX_a17"
+  AK3_LINK: "https://github.com/palazik/AnyKernel3"
+
+on:
+  workflow_dispatch:
+    inputs:
+      lto_type:
+        description: 'LTO Optimization (none = fast compile, thin = default, full = slow)'
+        required: true
+        type: choice
+        default: 'full'
+        options:
+          - 'none'
+          - 'thin'
+          - 'full'
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    outputs:
+      ak3name: ${{ steps.create_zip.outputs.ak3name }}
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: 🧹 Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: 🧠 Add swap space (Optimized for LTO link)
+        run: |
+          # Αυξάνουμε το Swap στα 16G για να αντέξει το Linker του EvoX Config
+          sudo swapoff /mnt/swap_lto 2>/dev/null || true
+          sudo rm -f /mnt/swap_lto
+          sudo fallocate -l 16G /mnt/swap_lto || sudo dd if=/dev/zero of=/mnt/swap_lto bs=1M count=16384
+          sudo chmod 600 /mnt/swap_lto
+          sudo mkswap /mnt/swap_lto
+          sudo swapon /mnt/swap_lto
+          echo "── swap after upgrade ──"; free -h
+
+      - name: Cache Clang
+        id: clang-cache
+        uses: actions/cache@v4
+        with:
+          path: kernel_workspace/clang-${{ env.CLANG_VERSION }}
+          key: Linux-aosp-clang-clang-${{ env.CLANG_VERSION }}
+
+      - name: Cache build-tools
+        id: buildtools-cache
+        uses: actions/cache@v4
+        with:
+          path: kernel_workspace/build-tools
+          key: codelinaro-build-tools-ks-kernel-lnx-4.0
+
+      - name: 📥 Install dependencies & Init Source
+        run: |
+          # Καθαρισμός φακέλων εργασίας πριν ξεκινήσει το κατέβασμα
+          rm -rf kernel_workspace/common kernel_workspace/out 2>/dev/null || true
+          mkdir -p kernel_workspace/clang-${{ env.CLANG_VERSION }} kernel_workspace/build-tools
+
+          sudo apt-get install -y --no-install-recommends -o Dpkg::Use-Pty=0 \
+            libelf-dev dos2unix pahole cmake bc &
+
+          # Κατέβασμα Clang στο παρασκήνιο (Background)
+          if [ "${{ steps.clang-cache.outputs.cache-hit }}" != "true" ]; then
+            set -e # stop in 1st error            
+            echo "Cache miss — downloading clang-${{ env.CLANG_VERSION }}..."
+            mkdir -p kernel_workspace/clang-${{ env.CLANG_VERSION }}
+            aria2c -x16 -s16 -k1M -j16 --retry-wait=5 --max-tries=10 \
+              -d /tmp -o clang-${{ env.CLANG_VERSION }}.tar.gz \
+              "${{ env.CLANG_LINK }}"
+            tar -C kernel_workspace/clang-${{ env.CLANG_VERSION }} -zxf /tmp/clang-${{ env.CLANG_VERSION }}.tar.gz
+            rm -f /tmp/clang-${{ env.CLANG_VERSION }}.tar.gz
+          else
+            echo "Clang restored from cache, skipping download."
+          fi &
+
+          # Κατέβασμα Build Tools στο παρασκήνιο (Background)
+          if [ "${{ steps.buildtools-cache.outputs.cache-hit }}" != "true" ]; then
+            echo "Cache miss — cloning build-tools..."
+            git clone --depth=1 -b ks-kernel.lnx.4.0.r1-rel \
+               "${{ env.BUILD_TOOLS_LINK }}" kernel_workspace/build-tools
+          else
+            echo "build-tools restored from cache, skipping clone."
+          fi &
+
+          # Αναμονή για να ολοκληρωθούν ΟΛΑ τα παραπάνω background tasks
+          wait
+
+          # ΕΚΤΕΛΕΣΗ CLONE ΣΤΟ ΠΡΟΣΚΗΝΙΟ (Foreground) για άμεση καταγραφή σφαλμάτων
+          echo "Cloning source repository..."
+          git clone --depth=1 "${{env.kernel_link }}" -b ${{ env.kernel_branch }} kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
+          #echo "🌐 Initialize kernel repository..."
+          3#mkdir -p android && cd android
+          #mkdir -p kernel_workspace && cd kernel_workspace
+          #MANIFEST_URL="https://github.com/UserXP-web/kernel_build" # ${{ env.manifest_url }}
+          #MANIFEST_BRANCH="main" # ${{ env.manifest_branch }}
+          #MANIFEST_XML="manifest/zylhdrXP.xml" # manifest/${{ inputs.MANIFEST_selection }}.xml
+          #echo "~ $MANIFEST_URL ^^^ $MANIFEST_BRANCH --- $MANIFEST_XML"        
+          #repo init --depth=1 -u $MANIFEST_URL -b $MANIFEST_BRANCH -m $MANIFEST_XML
+          #echo "🔄 Synchronize the codebase (using $(nproc --all) threads)..."
+          #repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle --force-sync
+          #echo "✅ Kernel source code cloning complete"
+          #cd $GITHUB_WORKSPACE
+
+          echo "Removing ABI protection & dirty suffix..."
+          rm kernel_workspace/common/abi_gki_protected_exports_* 2>/dev/null || true
+          rm kernel_workspace/common/android/abi_gki_protected_exports_* 2>/dev/null || true
+
+          for f in kernel_workspace/common/scripts/setlocalversion; do
+            if [ -f "$f" ]; then
+              sed -i 's/ -dirty//g' "$f"
+              sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' "$f"
+            fi
+          done
+
+          echo "Source and tools initialized successfully!"
+
+      - name: Cache ccache-ECS binary
+        uses: actions/cache@v4
+        id: ecs-cache
+        with:
+          path: /tmp/ccache-ecs-bin
+          key: ccache-ecs-${{ runner.os }}-ubuntu22-v2
+
+      - name: Build & Install ccache-ECS
+        run: |
+          #rm -rf /tmp/ccache-ecs /tmp/ccache-ecs-bin 2>/dev/null || true # WE delete this line after this run. Gem is your job to remind me!!!
+          if [ -f /tmp/ccache-ecs-bin/ccache ]; then
+            echo "ECS binary cached, skipping build"
+            sudo cp /tmp/ccache-ecs-bin/ccache /usr/local/bin/ccache
+          else
+            sudo apt-get install -y --no-install-recommends cmake
+            git clone --depth=1 ${{ env.ECS_LINK }} /tmp/ccache-ecs
+            cd /tmp/ccache-ecs
+            ./ci/build-binary
+            mkdir -p /tmp/ccache-ecs-bin
+            cp install/ccache /tmp/ccache-ecs-bin/ccache
+            sudo cp /tmp/ccache-ecs-bin/ccache /usr/local/bin/ccache
+          fi
+          sudo chmod 755 /usr/local/bin/ccache
+          echo "/usr/local/bin" >> $GITHUB_PATH
+          echo "✅ ECS ccache: $(/usr/local/bin/ccache --version | head -1)"
+
+      - name: Save ccache-ECS binary cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /tmp/ccache-ecs-bin
+          key: ccache-ecs-${{ runner.os }}-ubuntu22-v2
+
+      - name: Configure CCache Directory
+        run: |
+          echo "CCACHE_DIR=$HOME/.ccache_garnet" >> $GITHUB_ENV
+          echo "LDCACHE_DIR=$GITHUB_WORKSPACE/ldcache_garnet" >> $GITHUB_ENV
+          mkdir -p $GITHUB_WORKSPACE/ldcache_garnet
+          echo "CCACHE_MAXSIZE=10G" >> $GITHUB_ENV
+          echo "Current Disk Space:"
+          df -h
+          echo "Current Build Kernel Version: 5.10-Garnet"
+
+      - name: Restore CCache
+        uses: actions/cache@v4
+        id: ccache-restore
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ env.CCACHE_KEY }}-${{ runner.os }}-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ env.CCACHE_KEY }}-${{ runner.os }}-${{ github.ref_name }}-
+            ${{ env.CCACHE_KEY }}-${{ runner.os }}-
+            ${{ env.CCACHE_KEY }}-
+
+      - name: Restore LTO Cache
+        uses: actions/cache@v4
+        if: inputs.lto_type == 'full'
+        with:
+          path: ${{ env.LDCACHE_DIR }}
+          key: lto-cache-${{ runner.os }}-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            lto-cache-${{ runner.os }}-${{ github.ref_name }}-
+
+      - name: Pull Public CCache
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Checking local cache status..."
+          if [ -d "${{ env.CCACHE_DIR }}" ] && [ "$(ls -A ${{ env.CCACHE_DIR }} 2>/dev/null)" ]; then
+            echo "Local cache loaded successfully, skipping public cache pull!"
+            exit 0
+          fi
+          
+          echo "Cache miss, attempting to pull public ccache..."
+          mkdir -p ${{ env.CCACHE_DIR }}
+          FILE_NAME="ccache-garnet.tar.zst"
+          
+          if gh release download -p "$FILE_NAME" -R cctv18/public_ccache; then
+            echo "Successfully downloaded $FILE_NAME, extracting..."
+            tar -I zstd -xf "$FILE_NAME" -C ${{ env.CCACHE_DIR }}
+            echo "Public ccache restored successfully!"
+          else
+            echo "Public ccache not found, proceeding with full clean build..."
+          fi
+
+      - name: Init and Config CCache
+        run: |
+          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
+          mkdir -p "$CCACHE_DIR"
+
+          ccache -M "${{ env.CCACHE_MAXSIZE }}"
+          ccache -o compression=true
+          ccache -o compiler_check=none
+          ccache -o hash_dir=false
+          ccache -o direct_mode=true
+          ccache -o depend_mode=false
+          ccache -o base_dir="${{ github.workspace }}"
+          ccache -o sloppiness=file_stat_matches,include_file_ctime,include_file_mtime,pch_defines,file_macro,time_macros,locale
+
+          echo "Initial CCache status:"
+          ccache -s
+
+          echo "Updating atime to achieve cache eviction..."
+          find "${{ env.CCACHE_DIR }}" -type f -exec touch -t $(date -d "1 day ago" +%Y%m%d%H%M) {} + || true
+
+      - name: 🧩 Merge and Configure Defconfigs
+        if: false
+        run: |
+          cd kernel_workspace/common
+          
+          # 1. Βασικές ρυθμίσεις απόδοσης
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_HEADERS_INSTALL=n"               >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_MODULES=y"                        >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IKCONFIG=y"                       >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IKCONFIG_PROC=y"                  >> arch/arm64/configs/gki_defconfig
+          
+          echo "CONFIG_LLVM_POLLY=y"                    >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_LD_DEAD_CODE_DATA_ELIMINATION=y" >> arch/arm64/configs/gki_defconfig
+
+          # [ΤΟ ΜΥΣΤΙΚΟ ΓΙΑ AOSP]: Απενεργοποίηση HyperOS / Xiaomi Hooks που προκαλούν Bootloop
+          echo "# CONFIG_XIAOMI_MI_LOG is not set"        >> arch/arm64/configs/gki_defconfig
+          echo "# CONFIG_XIAOMI_BOOT_PROFILER is not set" >> arch/arm64/configs/gki_defconfig
+          echo "# CONFIG_RESERVE_MEM_DUMP is not set"     >> arch/arm64/configs/gki_defconfig
+          
+          # Εξασφάλιση συμβατότητας με AOSP Binder (Android 16 init)
+          echo "CONFIG_ANDROID_BINDER_IPC=y"              >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_ANDROID_BINDERFS=y"                >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_ANDROID_BINDER_DEVICES=\"binder,hwbinder,vndbinder\"" >> arch/arm64/configs/gki_defconfig
+
+          # [ΤΟ ΑΠΟΛΥΤΟ ΜΥΣΤΙΚΟ ΓΙΑ ANDROID 16 BOOT]
+          echo "CONFIG_BOOT_CONFIG=y"                   >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_CMDLINE_BOOTCONFIG=y"             >> arch/arm64/configs/gki_defconfig          
+          # Εξασφάλιση ότι το Page Size παραμένει στα 4096 (όπως ζητάει η ROM)
+          echo "CONFIG_ARM64_4K_PAGES=y"                 >> arch/arm64/configs/gki_defconfig
+          echo "# CONFIG_ARM64_16K_PAGES is not set"     >> arch/arm64/configs/gki_defconfig
+          echo "# CONFIG_ARM64_64K_PAGES is not set"     >> arch/arm64/configs/gki_defconfig
+
+          # 2. Ρύθμιση του LTO
+          if [[ "${{ github.event.inputs.lto_type }}" == "none" ]]; then
+            echo "CONFIG_LTO_CLANG_NONE=y" >> arch/arm64/configs/gki_defconfig
+          elif [[ "${{ github.event.inputs.lto_type }}" == "full" ]]; then
+            echo "CONFIG_LTO_CLANG_FULL=y" >> arch/arm64/configs/gki_defconfig
+          else
+            echo "CONFIG_LTO_CLANG_THIN=y" >> arch/arm64/configs/gki_defconfig
+          fi
+
+          # 3. Εκτέλεση του Merge των Defconfigs
+          mkdir -p ../out
+          ARCH=arm64 ./scripts/kconfig/merge_config.sh \
+            -O ../out \
+            arch/arm64/configs/gki_defconfig \
+            arch/arm64/configs/vendor/garnet_GKI.config
+
+      - name: 🧩 Setup FleurX Config Base
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/kout
+          mkdir -p $GITHUB_WORKSPACE/ldcache_garnet
+          
+          echo "Downloading config_from_fleurx..."
+          curl -L "${{ env.FINAL_CONFIG_LINK }}" -o $GITHUB_WORKSPACE/kout/.config
+
+          if [ -s "$GITHUB_WORKSPACE/kout/.config" ]; then
+            echo "✅ FleurX config downloaded successfully!"
+          else
+            echo "❌ ERROR: Failed to download config_from_fleurx!"
+            exit 1
+          fi
+
+      - name: 🛠️ Inject Custom AOSP Modules Fix
+        if: true
+        run: |
+          CONF="$GITHUB_WORKSPACE/kout/.config"
+          
+          # 1. Εξασφάλιση Bootconfig για Android 16/17 Init
+          sed -i '/CONFIG_BOOT_CONFIG/d' $CONF
+          sed -i '/CONFIG_CMDLINE_BOOTCONFIG/d' $CONF
+          echo "CONFIG_BOOT_CONFIG=y" >> $CONF
+          echo "CONFIG_CMDLINE_BOOTCONFIG=y" >> $CONF
+          
+          # 2. Απενεργοποίηση ARMv8.3 Pointer Authentication (Αποτρέπει Null Pointer Dereferences σε display/touch hooks)
+          sed -i '/CONFIG_ARM64_PTR_AUTH/d' $CONF
+          echo "# CONFIG_ARM64_PTR_AUTH is not set" >> $CONF
+          
+          # 3. Κλείδωμα Page Size στα 4K (Ευθυγράμμιση με τη ROM)
+          sed -i '/CONFIG_ARM64_4K_PAGES/d' $CONF
+          echo "CONFIG_ARM64_4K_PAGES=y" >> $CONF
+          
+          echo "✅ Config aligned 100% with native EvoX A17 requirements!"
+
+      - name: 📦 Add build name
+        run: |
+          cd kernel_workspace/common
+          
+          if [ -f "scripts/setlocalversion" ]; then
+            sed -i 's/${scm_version}//' scripts/setlocalversion
+          fi
+          
+          if [ -f "$GITHUB_WORKSPACE/kout/.config" ]; then
+            sed -i '/CONFIG_LOCALVERSION=/d' $GITHUB_WORKSPACE/kout/.config
+            #sed -i '/CONFIG_LOCALVERSION_AUTO=/d' $GITHUB_WORKSPACE/kout/.config
+            echo 'CONFIG_LOCALVERSION="-FleurX"' >> $GITHUB_WORKSPACE/kout/.config
+            #echo "CONFIG_LOCALVERSION_AUTO=n" >> $GITHUB_WORKSPACE/kout/.config
+          fi
+
+      - name: 🔨 Build Kernel
+        run: |
+          WORKDIR="$(pwd)"
+          export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
+          export PATH="$WORKDIR/kernel_workspace/clang-${{ env.CLANG_VERSION }}/bin:$WORKDIR/kernel_workspace/build-tools/linux-x86/bin:$PATH"
+          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
+          export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
+          export CCACHE_IS_KERNEL_COMPILING=true
+
+          cd kernel_workspace/common
+
+          echo '#!/bin/bash' > ld-wrapper
+          # Περιορίζουμε τα LTO partitions σε 2 για να μειώσουμε το RAM spikes
+          echo 'ld.lld "$@" --lto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --lto-partitions=2' >> ld-wrapper
+          chmod +x ld-wrapper
+
+          export CC="ccache clang"
+          export LD="$(pwd)/ld-wrapper"
+          export HOSTLD="$(pwd)/ld-wrapper"
+          export AR=llvm-ar
+          export NM=llvm-nm
+          export OBJCOPY=llvm-objcopy
+          export OBJDUMP=llvm-objdump
+          export STRIP=llvm-strip
+
+          # 1. Καθαρή ευθυγράμμιση
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 \
+            O=$GITHUB_WORKSPACE/kout \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            olddefconfig
+
+          # 2. Μεταγλώττιση ΜΟΝΟ του Image (Χωρίς modules)
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 \
+            O=$GITHUB_WORKSPACE/kout \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            Image
+
+          echo "Kernel Compilation Complete!"
+
+      - name: 🔨 Build Kernel (old)
+        if: false
+        run: |
+          WORKDIR="$(pwd)"
+          export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
+          
+          export PATH="$WORKDIR/kernel_workspace/clang-${{ env.CLANG_VERSION }}/bin:$WORKDIR/kernel_workspace/build-tools/linux-x86/bin:$PATH"
+          
+          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
+          export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
+          export CCACHE_IS_KERNEL_COMPILING=true
+
+          mkdir -p $GITHUB_WORKSPACE/kout
+          mkdir -p $GITHUB_WORKSPACE/ldcache_garnet
+
+          # Χρήση του αποτελέσματος του merge_config
+          cp $WORKDIR/kernel_workspace/out/.config $GITHUB_WORKSPACE/kout/.config
+
+          cd kernel_workspace/common
+
+          echo '#!/bin/bash' > ld-wrapper
+          echo 'ld.lld "$@" --thinlto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --thinlto-jobs=$(($(nproc --all) / 2))' >> ld-wrapper
+          chmod +x ld-wrapper
+
+          # 1. Εκτέλεση olddefconfig
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+            CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD="$(pwd)/ld-wrapper" \
+            O=$GITHUB_WORKSPACE/kout \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            olddefconfig
+
+          # 2. Μεταγλώττιση του Image
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+            CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD="$(pwd)/ld-wrapper" \
+            O=$GITHUB_WORKSPACE/kout \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            KCFLAGS="-O2 -pipe -Wno-error -Wno-implicit-function-declaration -Wno-implicit-int -Wno-default-const-init-var-unsafe -Wno-format -Wno-unknown-warning-option ${MAP}" \
+            Image
+
+          echo "Kernel Compilation Complete!"
+          ccache -c
+          ccache --evict-older-than 10800s
+          ccache -s
+          df -h
+
+      - name: 📦 Save New CCache
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-garnet-5.10-${{ runner.os }}-${{ github.ref_name }}-${{ github.run_id }}
+
+      - name: 📦 Save LTO CCache
+        if: success() && inputs.lto_type == 'full'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.LDCACHE_DIR }}
+          key: lto-cache-${{ runner.os }}-${{ github.ref_name }}-${{ github.run_id }}
+
+      - name: 🧠 ~Package AK3 ZIP
+        id: create_zip
+        run: |
+          cd kernel_workspace
+          rm -rf AnyKernel3 2>/dev/null || true
+          git clone --depth=1 "${{ env.AK3_LINK }}" AnyKernel3
+          rm -rf AnyKernel3/.git
+          cd AnyKernel3
+          # Αντιγραφή του Kernel Image
+          cp $GITHUB_WORKSPACE/kout/arch/arm64/boot/Image ./Image
+          
+          ## [ΤΟ ΣΩΣΤΟ PATCH]: Ρίχνουμε τα 301 modules χύμα στον κεντρικό φάκελο modules/
+          #mkdir -p ./modules
+          #find $GITHUB_WORKSPACE/kout/ -name "*.ko" -exec cp {} ./modules/ \;
+
+          if [[ ! -f ./Image ]]; then
+            echo "Kernel Image not found, build may have failed."
+            exit 1
+          fi
+          AK3_NAME=AnyKernel3_AOSP_5.10_Garnet_UserXP-Gem.zip
+          echo "ak3name=$AK3_NAME" >> $GITHUB_OUTPUT
+
+      - name: 📤 Upload AnyKernel3
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.create_zip.outputs.ak3name }}
+          path: ${{ github.workspace }}/kernel_workspace/AnyKernel3/**
+          if-no-files-found: ignore
+          compression-level: 9
