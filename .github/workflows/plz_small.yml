@@ -96,7 +96,7 @@ jobs:
       - name: 📥 Install dependencies & Init Source
         run: |
           # Καθαρισμός φακέλων εργασίας πριν ξεκινήσει το κατέβασμα
-          rm -rf sm7435 kernel_workspace/out 2>/dev/null || true
+          rm -rf kernel/xiaomi/sm7435 kernel_workspace/out 2>/dev/null || true
           mkdir -p kernel_workspace/clang-${{ env.CLANG_VERSION }} kernel_workspace/build-tools
 
           sudo apt-get install -y --no-install-recommends -o Dpkg::Use-Pty=0 \
@@ -130,8 +130,8 @@ jobs:
 
           # ΕΚΤΕΛΕΣΗ CLONE ΣΤΟ ΠΡΟΣΚΗΝΙΟ (Foreground) για άμεση καταγραφή σφαλμάτων
           echo "Cloning source repository..."
-          #mkdir -p kernel/xiaomi
-          git clone --depth=1 "${{env.kernel_link }}" -b ${{ env.kernel_branch }} sm7435 || { echo "❌ ERROR: Git clone failed!"; exit 1; }
+          mkdir -p kernel/xiaomi
+          git clone --depth=1 "${{env.kernel_link }}" -b ${{ env.kernel_branch }} kernel/xiaomi/sm7435 || { echo "❌ ERROR: Git clone failed!"; exit 1; }
           
           #echo "🌐 Initialize kernel repository..."
           #mkdir -p android && cd android
@@ -147,9 +147,9 @@ jobs:
           #cd $GITHUB_WORKSPACE
 
           echo "Removing ABI protection & dirty suffix..."
-          rm sm7435/abi_gki_protected_exports_* 2>/dev/null || true
-          rm sm7435/android/abi_gki_protected_exports_* 2>/dev/null || true
-          for f in sm7435/scripts/setlocalversion; do
+          rm kernel/xiaomi/sm7435/abi_gki_protected_exports_* 2>/dev/null || true
+          rm kernel/xiaomi/sm7435/android/abi_gki_protected_exports_* 2>/dev/null || true
+          for f in kernel/xiaomi/sm7435/scripts/setlocalversion; do
             if [ -f "$f" ]; then
               sed -i 's/ -dirty//g' "$f"
               sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' "$f"
@@ -285,7 +285,7 @@ jobs:
       - name: 🧩 Merge and Configure Defconfigs
         if: false
         run: |
-          cd sm7435
+          cd kernel/xiaomi/sm7435
           
           # 1. Βασικές ρυθμίσεις απόδοσης
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> arch/arm64/configs/gki_defconfig
@@ -348,7 +348,7 @@ jobs:
 
       - name: 📦 Add build name
         run: |
-          cd sm7435
+          cd kernel/xiaomi/sm7435
           
           if [ -f "scripts/setlocalversion" ]; then
             sed -i 's/${scm_version}//' scripts/setlocalversion
@@ -370,7 +370,7 @@ jobs:
           export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
           export CCACHE_IS_KERNEL_COMPILING=true
 
-          cd $GITHUB_WORKSPACE/sm7435
+          cd $GITHUB_WORKSPACE/kernel/xiaomi/sm7435
 
           echo '#!/bin/bash' > ld-wrapper
           # Περιορίζουμε τα LTO partitions σε 2 για να μειώσουμε το RAM spikes
