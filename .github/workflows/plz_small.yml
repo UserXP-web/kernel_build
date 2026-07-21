@@ -127,7 +127,7 @@ jobs:
           echo "Cloning source repository..."
           git clone --depth=1 "${{env.kernel_link }}" -b ${{ env.kernel_branch }} kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
           #echo "🌐 Initialize kernel repository..."
-          3#mkdir -p android && cd android
+          #mkdir -p android && cd android
           #mkdir -p kernel_workspace && cd kernel_workspace
           #MANIFEST_URL="https://github.com/UserXP-web/kernel_build" # ${{ env.manifest_url }}
           #MANIFEST_BRANCH="main" # ${{ env.manifest_branch }}
@@ -143,7 +143,7 @@ jobs:
           # ===>>> ΝΕΑ ΕΝΘΕΣΗ ΓΙΑ ΤΟ TRY 1.296 <<<===
           echo "Pre-cloning custom Xiaomi sm7435-modules to bypass generic drivers..."
           rm -rf kernel_workspace/sm7435-modules 2>/dev/null || true
-          git clone --depth=1 -b lineage-21 "https://github.com/zylhdrXP/android_kernel_xiaomi_sm7435-modules" kernel_workspace/sm7435-modules
+          git clone --depth=1 -b lineage-23.2 "https://github.com/zylhdrXP/android_kernel_xiaomi_sm7435-modules" kernel_workspace/sm7435-modules
           echo "✅ Custom Xiaomi modules injected at kernel_workspace/sm7435-modules"
 
 
