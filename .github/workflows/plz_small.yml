@@ -164,11 +164,11 @@ jobs:
           #find kernel_workspace/sm7435-modules/ -name "*fts*notifier*.c" -exec sed -i 's/return rc;/return 0;/g' {} +
           #find kernel_workspace/sm7435-modules/ -name "*fts*probe*.c" -exec sed -i 's/goto .*fail.*/return 0;/g' {} +
 
-          #echo "🔓 Applying DRM Master Drop-Force Patches..."
-          ## DRM Master Verification Bypass (Bypass the lock from HyperOS vendor blobs)
-          #find kernel_workspace/sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/if (!drm_is_current_master/if (0 \&\& !drm_is_current_master/g' {} +
-          #find kernel_workspace/sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/ret = drm_setmaster_ioctl/ret = 0; \/\/ drm_setmaster_ioctl/g' {} +
-          #find kernel_workspace/sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/return -EPERM;/return 0;/g' {} +
+          echo "🔓 Applying DRM Master Drop-Force Patches..."
+          # DRM Master Verification Bypass (Bypass the lock from HyperOS vendor blobs)
+          find kernel_workspace/sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/if (!drm_is_current_master/if (0 \&\& !drm_is_current_master/g' {} +
+          find kernel_workspace/sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/ret = drm_setmaster_ioctl/ret = 0; \/\/ drm_setmaster_ioctl/g' {} +
+          find kernel_workspace/sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/return -EPERM;/return 0;/g' {} +
           
           echo "✅ All Try 1.297 Custom Injections applied successfully!"
 
