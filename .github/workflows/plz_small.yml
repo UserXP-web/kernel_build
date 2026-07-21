@@ -139,6 +139,14 @@ jobs:
           #echo "✅ Kernel source code cloning complete"
           #cd $GITHUB_WORKSPACE
 
+
+          # ===>>> ΝΕΑ ΕΝΘΕΣΗ ΓΙΑ ΤΟ TRY 1.296 <<<===
+          echo "Pre-cloning custom Xiaomi sm7435-modules to bypass generic drivers..."
+          rm -rf kernel_workspace/sm7435-modules 2>/dev/null || true
+          git clone --depth=1 -b lineage-21 "https://github.com/zylhdrXP/android_kernel_xiaomi_sm7435-modules" kernel_workspace/sm7435-modules
+          echo "✅ Custom Xiaomi modules injected at kernel_workspace/sm7435-modules"
+
+
           echo "Removing ABI protection & dirty suffix..."
           rm kernel_workspace/common/abi_gki_protected_exports_* 2>/dev/null || true
           rm kernel_workspace/common/android/abi_gki_protected_exports_* 2>/dev/null || true
