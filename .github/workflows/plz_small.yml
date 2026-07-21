@@ -20,6 +20,8 @@ env:
   kernel_branch: "lineage-23.2"
   #kernel_link: "https://github.com/crdroidandroid/android_xiaomi_kernel_garnet"
   #kernel_branch: "16.0"
+  kernel_modules_link: "https://github.com/zylhdrXP/android_kernel_xiaomi_sm7435-modules"
+  kernel_modules_branch: "lineage-23.2"
   ECS_LINK: "https://github.com/cctv18/ccache-ECS.git"  
   #CLANG_VERSION: "r563880c" ### NEW_CLANG_LINK="${CLANG_LINK/\{CLANG_VERSION\}/$CLANG_VERSION}"
   #CLANG_LINK: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android16-qpr2-release/clang-r563880c.tar.gz"
@@ -91,7 +93,7 @@ jobs:
       - name: 📥 Install dependencies & Init Source
         run: |
           # Καθαρισμός φακέλων εργασίας πριν ξεκινήσει το κατέβασμα
-          rm -rf kernel_workspace/common kernel_workspace/out 2>/dev/null || true
+          rm -rf kernel/xiaomi/sm7435 kernel_workspace/out 2>/dev/null || true
           mkdir -p kernel_workspace/clang-${{ env.CLANG_VERSION }} kernel_workspace/build-tools
 
           sudo apt-get install -y --no-install-recommends -o Dpkg::Use-Pty=0 \
@@ -125,7 +127,9 @@ jobs:
 
           # ΕΚΤΕΛΕΣΗ CLONE ΣΤΟ ΠΡΟΣΚΗΝΙΟ (Foreground) για άμεση καταγραφή σφαλμάτων
           echo "Cloning source repository..."
-          git clone --depth=1 "${{env.kernel_link }}" -b ${{ env.kernel_branch }} kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
+          #git clone --depth=1 "${{env.kernel_link }}" -b ${{ env.kernel_branch }} kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
+          git clone --depth=1 "${{env.kernel_link }}" -b ${{ env.kernel_branch }} kernel/xiaomi/sm7435 || { echo "❌ ERROR: Git clone failed!"; exit 1; }
+          
           #echo "🌐 Initialize kernel repository..."
           #mkdir -p android && cd android
           #mkdir -p kernel_workspace && cd kernel_workspace
@@ -140,10 +144,9 @@ jobs:
           #cd $GITHUB_WORKSPACE
 
           echo "Removing ABI protection & dirty suffix..."
-          rm kernel_workspace/common/abi_gki_protected_exports_* 2>/dev/null || true
-          rm kernel_workspace/common/android/abi_gki_protected_exports_* 2>/dev/null || true
-
-          for f in kernel_workspace/common/scripts/setlocalversion; do
+          rm kernel/xiaomi/sm7435/abi_gki_protected_exports_* 2>/dev/null || true
+          rm kernel/xiaomi/sm7435/android/abi_gki_protected_exports_* 2>/dev/null || true
+          for f in kernel/xiaomi/sm7435/scripts/setlocalversion; do
             if [ -f "$f" ]; then
               sed -i 's/ -dirty//g' "$f"
               sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' "$f"
@@ -152,25 +155,12 @@ jobs:
 
           echo "Source and tools initialized successfully!"
 
-      - name: 📺 Clone & Patch Custom Xiaomi Modules (Try 1.297)
+      - name: 📺 Clone & Patch Custom Xiaomi Modules
         run: |
           echo "Pre-cloning custom Xiaomi sm7435-modules to bypass generic drivers..."
-          rm -rf kernel_workspace/sm7435-modules 2>/dev/null || true
-          git clone --depth=1 -b lineage-23.2 "https://github.com/zylhdrXP/android_kernel_xiaomi_sm7435-modules" kernel_workspace/sm7435-modules
-          
-          #echo "🧩 Applying Monolithic & Touchscreen Fixes to the Correct Repo..."
-          ## Touchscreen Notifier Bypass (Register early success)
-          #find kernel_workspace/sm7435-modules/ -name "*fts*notifier*.c" -exec sed -i 's/return -ENODEV;/return 0;/g' {} +
-          #find kernel_workspace/sm7435-modules/ -name "*fts*notifier*.c" -exec sed -i 's/return rc;/return 0;/g' {} +
-          #find kernel_workspace/sm7435-modules/ -name "*fts*probe*.c" -exec sed -i 's/goto .*fail.*/return 0;/g' {} +
-
-          echo "🔓 Applying DRM Master Drop-Force Patches..."
-          # DRM Master Verification Bypass (Bypass the lock from HyperOS vendor blobs)
-          find kernel_workspace/sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/if (!drm_is_current_master/if (0 \&\& !drm_is_current_master/g' {} +
-          find kernel_workspace/sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/ret = drm_setmaster_ioctl/ret = 0; \/\/ drm_setmaster_ioctl/g' {} +
-          find kernel_workspace/sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/return -EPERM;/return 0;/g' {} +
-          
-          echo "✅ All Try 1.297 Custom Injections applied successfully!"
+          rm -rf sm7435-modules 2>/dev/null || true
+          git clone --depth=1 "${{env.kernel_modules_link }}" -b ${{ env.kernel_modules_branch }} sm7435-modules          
+          echo "✅ Clean Xiaomi modules injected at the workspace root folder!"
 
       - name: Cache ccache-ECS binary
         uses: actions/cache@v4
@@ -280,7 +270,7 @@ jobs:
       - name: 🧩 Merge and Configure Defconfigs
         if: false
         run: |
-          cd kernel_workspace/common
+          cd kernel/xiaomi/sm7435
           
           # 1. Βασικές ρυθμίσεις απόδοσης
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> arch/arm64/configs/gki_defconfig
@@ -343,7 +333,7 @@ jobs:
 
       - name: 📦 Add build name
         run: |
-          cd kernel_workspace/common
+          cd kernel/xiaomi/sm7435
           
           if [ -f "scripts/setlocalversion" ]; then
             sed -i 's/${scm_version}//' scripts/setlocalversion
@@ -365,7 +355,7 @@ jobs:
           export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
           export CCACHE_IS_KERNEL_COMPILING=true
 
-          cd kernel_workspace/common
+          cd kernel/xiaomi/sm7435
 
           echo '#!/bin/bash' > ld-wrapper
           # Περιορίζουμε τα LTO partitions σε 2 για να μειώσουμε το RAM spikes
@@ -413,7 +403,7 @@ jobs:
           # Χρήση του αποτελέσματος του merge_config
           cp $WORKDIR/kernel_workspace/out/.config $GITHUB_WORKSPACE/kout/.config
 
-          cd kernel_workspace/common
+          cd kernel/xiaomi/sm7435
 
           echo '#!/bin/bash' > ld-wrapper
           echo 'ld.lld "$@" --thinlto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --thinlto-jobs=$(($(nproc --all) / 2))' >> ld-wrapper
