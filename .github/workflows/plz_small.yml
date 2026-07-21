@@ -4,7 +4,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-5.10-garnet
   cancel-in-progress: true
   # https://github.com/Neutron-Toolchains/clang-build-catalogue
-  # https://github.com/zylhdrXP/android_kernel_common-5.10
+  # https://github.com/zylhdrXP/android_kernel_common-5.10 👑🏁
 
 env:
   TZ: Europe/Athens
@@ -23,6 +23,9 @@ env:
   kernel_modules_link: "https://github.com/zylhdrXP/android_kernel_xiaomi_sm7435-modules"
   kernel_modules_branch: "lineage-23.2"
   ECS_LINK: "https://github.com/cctv18/ccache-ECS.git"  
+  #CLANG_LINK: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android16-qpr2-release/clang-r547379.tar.gz"
+  #CLANG_LINK: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android15-qpr2-release/clang-r536225.tar.gz"
+  #CLANG_LINK: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android14-qpr3-release/clang-r487747c.tar.gz"
   #CLANG_VERSION: "r563880c" ### NEW_CLANG_LINK="${CLANG_LINK/\{CLANG_VERSION\}/$CLANG_VERSION}"
   #CLANG_LINK: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android16-qpr2-release/clang-r563880c.tar.gz"
   CLANG_VERSION: "r584948"
@@ -162,11 +165,15 @@ jobs:
           git clone --depth=1 "${{ env.kernel_modules_link }}" -b ${{ env.kernel_modules_branch }} kernel/xiaomi/sm7435-modules
           echo "✅ Modules aligned at kernel/xiaomi/sm7435-modules!"
 
-          #echo "🔓 Applying DRM Master Drop-Force Patches..."
-          ## DRM Master Verification Bypass (Bypass the lock from HyperOS vendor blobs)
-          #find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/if (!drm_is_current_master/if (0 \&\& !drm_is_current_master/g' {} +
-          #find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/ret = drm_setmaster_ioctl/ret = 0; \/\/ drm_setmaster_ioctl/g' {} +
-          #find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/return -EPERM;/return 0;/g' {} +
+          echo "🛠️ Injecting Null-Pointer & 🔓 Garbage Data Bypasses..."
+          # 1. Εξαναγκασμός του panel parsing να μην επιστρέφει PTR_ERR
+          find kernel/xiaomi/sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/return PTR_ERR(prim_panel);/return 0;/g' {} +
+          find kernel/xiaomi/sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/if (IS_ERR_OR_NULL(prim_panel))/if (0)/g' {} +
+          find kernel/xiaomi/sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/if (!prim_panel)/if (0)/g' {} +
+          # 2. Force drop του DRM Master instance για να σπάσει το userspace lock
+          find kernel/xiaomi/sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/if (!drm_is_current_master/if (0 \&\& !drm_is_current_master/g' {} +
+          find kernel/xiaomi/sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/ret = drm_setmaster_ioctl/ret = 0; \/\/ drm_setmaster_ioctl/g' {} +
+          find kernel/xiaomi/sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/return -EPERM;/return 0;/g' {} +
 
       - name: Cache ccache-ECS binary
         uses: actions/cache@v4
