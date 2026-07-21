@@ -127,7 +127,7 @@ jobs:
 
           # ΕΚΤΕΛΕΣΗ CLONE ΣΤΟ ΠΡΟΣΚΗΝΙΟ (Foreground) για άμεση καταγραφή σφαλμάτων
           echo "Cloning source repository..."
-          #git clone --depth=1 "${{env.kernel_link }}" -b ${{ env.kernel_branch }} kernel_workspace/common || { echo "❌ ERROR: Git clone failed!"; exit 1; }
+          mkdir -p kernel/xiaomi
           git clone --depth=1 "${{env.kernel_link }}" -b ${{ env.kernel_branch }} kernel/xiaomi/sm7435 || { echo "❌ ERROR: Git clone failed!"; exit 1; }
           
           #echo "🌐 Initialize kernel repository..."
@@ -158,15 +158,15 @@ jobs:
       - name: 📺 Clone & Patch Custom Xiaomi Modules
         run: |
           echo "Pre-cloning custom Xiaomi sm7435-modules to bypass generic drivers..."
-          rm -rf sm7435-modules 2>/dev/null || true
-          git clone --depth=1 "${{env.kernel_modules_link }}" -b ${{ env.kernel_modules_branch }} sm7435-modules          
-          echo "✅ Clean Xiaomi modules injected at the workspace root folder!"
+          rm -rf kernel/xiaomi/sm7435-modules 2>/dev/null || true
+          git clone --depth=1 "${{ env.kernel_modules_link }}" -b ${{ env.kernel_modules_branch }} kernel/xiaomi/sm7435-modules
+          echo "✅ Modules aligned at kernel/xiaomi/sm7435-modules!"
 
-          echo "🔓 Applying DRM Master Drop-Force Patches..."
-          # DRM Master Verification Bypass (Bypass the lock from HyperOS vendor blobs)
-          find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/if (!drm_is_current_master/if (0 \&\& !drm_is_current_master/g' {} +
-          find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/ret = drm_setmaster_ioctl/ret = 0; \/\/ drm_setmaster_ioctl/g' {} +
-          find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/return -EPERM;/return 0;/g' {} +
+          #echo "🔓 Applying DRM Master Drop-Force Patches..."
+          ## DRM Master Verification Bypass (Bypass the lock from HyperOS vendor blobs)
+          #find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/if (!drm_is_current_master/if (0 \&\& !drm_is_current_master/g' {} +
+          #find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/ret = drm_setmaster_ioctl/ret = 0; \/\/ drm_setmaster_ioctl/g' {} +
+          #find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/return -EPERM;/return 0;/g' {} +
 
       - name: Cache ccache-ECS binary
         uses: actions/cache@v4
@@ -361,7 +361,7 @@ jobs:
           export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
           export CCACHE_IS_KERNEL_COMPILING=true
 
-          cd kernel/xiaomi/sm7435
+          cd $GITHUB_WORKSPACE/kernel/xiaomi/sm7435
 
           echo '#!/bin/bash' > ld-wrapper
           # Περιορίζουμε τα LTO partitions σε 2 για να μειώσουμε το RAM spikes
@@ -414,7 +414,7 @@ jobs:
           rm -rf AnyKernel3/.git
           cd AnyKernel3
           # Αντιγραφή του Kernel Image
-          cp $GITHUB_WORKSPACE/kout/arch/arm64/boot/Image kernel_workspace/AnyKernel3/
+          cp $GITHUB_WORKSPACE/kout/arch/arm64/boot/Image ./Image
           
           ## [ΤΟ ΣΩΣΤΟ PATCH]: Ρίχνουμε τα 301 modules χύμα στον κεντρικό φάκελο modules/
           #mkdir -p ./modules
