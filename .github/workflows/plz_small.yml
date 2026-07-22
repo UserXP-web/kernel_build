@@ -324,19 +324,24 @@ jobs:
             exit 1
           fi
 
-      - name: 📦 Add build name & Disable Werror
+      - name: 📦 Add build name & Patch Haptics Warning
         run: |
-          cd $GITHUB_WORKSPACE/sm7435          
+          cd $GITHUB_WORKSPACE/sm7435
+          
           if [ -f "scripts/setlocalversion" ]; then
             sed -i 's/${scm_version}//' scripts/setlocalversion
-          fi          
+          fi
+          
           if [ -f "$GITHUB_WORKSPACE/kout/.config" ]; then
             sed -i '/CONFIG_LOCALVERSION=/d' $GITHUB_WORKSPACE/kout/.config
             echo 'CONFIG_LOCALVERSION="-FleurX-${{ github.run_number }}"' >> $GITHUB_WORKSPACE/kout/.config
-            
-            # [ΚΡΙΣΙΜΟ FIX]: Απενεργοποίηση των Warnings-as-Errors για τον Clang 21
-            sed -i '/CONFIG_WERROR=/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_WERROR=n" >> $GITHUB_WORKSPACE/kout/.config
+          fi
+
+          # Αρχικοποίηση της μεταβλητής name για να μην χτυπήσει το τοπικό script
+          HAPTICS_FILE="drivers/input/misc/qcom-hv-haptics.c"
+          if [ -f "$HAPTICS_FILE" ]; then
+            echo "Patching uninitialized variable inside qcom-hv-haptics.c..."
+            sed -i 's/const char \*name;/const char \*name = NULL;/g' "$HAPTICS_FILE"
           fi
 
       - name: 🔨 Build Kernel
