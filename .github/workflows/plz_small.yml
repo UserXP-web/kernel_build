@@ -172,13 +172,23 @@ jobs:
           wait
           echo "Tools initialized successfully!"
 
-      - name: 📺 Clone & Patch Custom Xiaomi Modules
+      - name: 📺 Clone & Inline Link Xiaomi Hardware Modules
         run: |
-          echo "Aligning custom Xiaomi sm7435-modules inside the factory structure..."
+          echo "Cloning sm7435-modules inside the workspace..."
           rm -rf kernel/xiaomi/sm7435-modules 2>/dev/null || true
-          mkdir -p kernel/xiaomi
           git clone --depth=1 "${{ env.kernel_modules_link }}" -b ${{ env.kernel_modules_branch }} kernel/xiaomi/sm7435-modules
-          echo "✅ Modules perfectly aligned at kernel/xiaomi/sm7435-modules!"
+
+          echo "Injecting Display Techpack directly into the Kernel Core..."
+          cd kernel/xiaomi/sm7435
+          
+          # Καθαρίζουμε τυχόν generic/κενό φάκελο display
+          rm -rf techpack/display 2>/dev/null || true
+          mkdir -p techpack
+          
+          # Δημιουργούμε τη γέφυρα μνήμης (Symlink) προς τους display drivers
+          ln -s ../../sm7435-modules/techpack/display ./techpack/display
+          
+          echo "✅ Display Techpack is now tightly coupled inside the core!"
 
       - name: Cache ccache-ECS binary
         uses: actions/cache@v4
