@@ -96,7 +96,7 @@ jobs:
 
       - name: 📥 Install Dependencies & Sync Neutron Clang Toolchain
         run: |
-          rm -rf kernel/xiaomi/sm7435 kernel_workspace/out 2>/dev/null || true
+          rm -rf kernel_workspace/out 2>/dev/null || true
           mkdir -p kernel_workspace/build-tools
           
           sudo apt-get install -y --no-install-recommends aria2 libelf-dev dos2unix pahole cmake bc
@@ -119,15 +119,17 @@ jobs:
           wait
           echo "Tools initialized successfully!"
 
-      - name: 📥 Install Source
+      - name: 📥 Install Source (Core Kernel)
         run: |
-          mkdir -p kernel/xiaomi
-          git clone --depth=1 "${{ env.kernel_link }}" -b ${{ env.kernel_branch }} kernel/xiaomi/sm7435 || { echo "❌ ERROR: Git clone failed!"; exit 1; }
+          mkdir -p kernel_workspace/out
+          echo "Cloning core kernel repository..."
+          rm -rf sm7435 2>/dev/null || true
+          git clone --depth=1 "${{ env.kernel_link }}" -b ${{ env.kernel_branch }} sm7435
 
           echo "Removing ABI protection & dirty suffix..."
-          rm kernel/xiaomi/sm7435/abi_gki_protected_exports_* 2>/dev/null || true
-          rm kernel/xiaomi/sm7435/android/abi_gki_protected_exports_* 2>/dev/null || true
-          for f in kernel/xiaomi/sm7435/scripts/setlocalversion; do
+          rm sm7435/abi_gki_protected_exports_* 2>/dev/null || true
+          rm sm7435/android/abi_gki_protected_exports_* 2>/dev/null || true
+          for f in sm7435/scripts/setlocalversion; do
             if [ -f "$f" ]; then
               sed -i 's/ -dirty//g' "$f"
               sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' "$f"
@@ -139,7 +141,7 @@ jobs:
         if: false
         run: |
           # Καθαρισμός φακέλων εργασίας πριν ξεκινήσει το κατέβασμα
-          rm -rf kernel/xiaomi/sm7435 kernel_workspace/out 2>/dev/null || true
+          rm -rf sm7435 kernel_workspace/out 2>/dev/null || true
           mkdir -p kernel_workspace/clang-${{ env.CLANG_VERSION }} kernel_workspace/build-tools
 
           sudo apt-get install -y --no-install-recommends -o Dpkg::Use-Pty=0 \
@@ -172,22 +174,11 @@ jobs:
           wait
           echo "Tools initialized successfully!"
 
-      - name: 📺 Copy and Inline Techpack Drivers (Hard Copy)
+      - name: 📺 Clone Qualcomm Hardware Modules (Flat Layout)
         run: |
-          echo "Cloning sm7435-modules..."
-          rm -rf $GITHUB_WORKSPACE/kernel/xiaomi/sm7435-modules 2>/dev/null || true
-          git clone --depth=1 "${{ env.kernel_modules_link }}" -b ${{ env.kernel_modules_branch }} $GITHUB_WORKSPACE/kernel/xiaomi/sm7435-modules
-
-          echo "Injecting full Techpack structure into Kernel Root..."
-          cd $GITHUB_WORKSPACE/kernel/xiaomi/sm7435
-          
-          # Καθαρίζουμε τυχόν παλιό φάκελο techpack
-          rm -rf techpack 2>/dev/null || true
-          
-          # Φυσική αντιγραφή ΟΛΟΚΛΗΡΟΥ του φακέλου techpack από τα modules στη ρίζα του πυρήνα
-          cp -r $GITHUB_WORKSPACE/kernel/xiaomi/sm7435-modules/techpack ./
-          
-          echo "✅ Techpack drivers are now physically embedded in kernel root!"
+          echo "Cloning sm7435-modules exactly next to the kernel core..."
+          rm -rf sm7435-modules 2>/dev/null || true
+          git clone --depth=1 "${{ env.kernel_modules_link }}" -b ${{ env.kernel_modules_branch }} sm7435-modules
 
       - name: Cache ccache-ECS binary
         uses: actions/cache@v4
@@ -296,7 +287,7 @@ jobs:
       - name: 🧩 Merge and Configure Defconfigs
         if: false
         run: |
-          cd kernel/xiaomi/sm7435
+          cd sm7435
           
           # 1. Βασικές ρυθμίσεις απόδοσης και LTO
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> arch/arm64/configs/gki_defconfig
@@ -335,7 +326,7 @@ jobs:
 
       - name: 📦 Add build name (Dynamic Unique ID)
         run: |
-          cd kernel/xiaomi/sm7435
+          cd sm7435
           
           if [ -f "scripts/setlocalversion" ]; then
             sed -i 's/${scm_version}//' scripts/setlocalversion
@@ -357,10 +348,10 @@ jobs:
           export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
           export CCACHE_IS_KERNEL_COMPILING=true
 
-          cd $GITHUB_WORKSPACE/kernel/xiaomi/sm7435
+          # Μπαίνουμε στον flat φάκελο
+          cd $GITHUB_WORKSPACE/sm7435
 
           echo '#!/bin/bash' > ld-wrapper
-          # Περιορίζουμε τα LTO partitions σε 2 για να μειώσουμε το RAM spikes
           echo 'ld.lld "$@" --lto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --lto-partitions=2' >> ld-wrapper
           chmod +x ld-wrapper
 
@@ -373,18 +364,9 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
 
-          # 1. Καθαρή ευθυγράμμιση
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 \
-            O=$GITHUB_WORKSPACE/kout \
-            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
-            olddefconfig
-
-          # 2. Μεταγλώττιση ΜΟΝΟ του Image (Χωρίς modules)
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 \
-            O=$GITHUB_WORKSPACE/kout \
-            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
-            Image
-
+          # Ευθυγράμμιση και compile
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- olddefconfig
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- Image
           echo "Kernel Compilation Complete!"
 
       - name: 📦 Save New CCache
