@@ -172,30 +172,22 @@ jobs:
           wait
           echo "Tools initialized successfully!"
 
-      - name: 📺 Inject Xiaomi Display Drivers into Core Tree
+      - name: 📺 Copy and Inline Techpack Drivers (Hard Copy)
         run: |
           echo "Cloning sm7435-modules..."
           rm -rf $GITHUB_WORKSPACE/kernel/xiaomi/sm7435-modules 2>/dev/null || true
           git clone --depth=1 "${{ env.kernel_modules_link }}" -b ${{ env.kernel_modules_branch }} $GITHUB_WORKSPACE/kernel/xiaomi/sm7435-modules
 
-          # Δημιουργία του εσωτερικού φακέλου υποδοχής στους core drivers
-          rm -rf $GITHUB_WORKSPACE/kernel/xiaomi/sm7435/drivers/video/techpack 2>/dev/null || true
-          mkdir -p $GITHUB_WORKSPACE/kernel/xiaomi/sm7435/drivers/video/techpack
-          
-          echo "Copying Display Driver files using absolute paths..."
-          # Ελέγχουμε αν η δομή έχει techpack/display ή αν είναι χύμα στη ρίζα και αντιγράφουμε ανάλογα
-          if [ -d "$GITHUB_WORKSPACE/kernel/xiaomi/sm7435-modules/techpack/display" ]; then
-            cp -r $GITHUB_WORKSPACE/kernel/xiaomi/sm7435-modules/techpack/display/* $GITHUB_WORKSPACE/kernel/xiaomi/sm7435/drivers/video/techpack/
-          else
-            cp -r $GITHUB_WORKSPACE/kernel/xiaomi/sm7435-modules/* $GITHUB_WORKSPACE/kernel/xiaomi/sm7435/drivers/video/techpack/
-          fi
-          
-          # Εγχέουμε τις οδηγίες μεταγλώττισης στα core αρχεία
+          echo "Injecting full Techpack structure into Kernel Root..."
           cd $GITHUB_WORKSPACE/kernel/xiaomi/sm7435
-          echo "obj-y += techpack/" >> drivers/video/Makefile
-          echo "source \"drivers/video/techpack/Kconfig\"" >> drivers/video/Kconfig
           
-          echo "✅ Display driver heavily injected into core drivers/video/ !"
+          # Καθαρίζουμε τυχόν παλιό φάκελο techpack
+          rm -rf techpack 2>/dev/null || true
+          
+          # Φυσική αντιγραφή ΟΛΟΚΛΗΡΟΥ του φακέλου techpack από τα modules στη ρίζα του πυρήνα
+          cp -r $GITHUB_WORKSPACE/kernel/xiaomi/sm7435-modules/techpack ./
+          
+          echo "✅ Techpack drivers are now physically embedded in kernel root!"
 
       - name: Cache ccache-ECS binary
         uses: actions/cache@v4
