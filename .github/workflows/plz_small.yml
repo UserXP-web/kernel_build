@@ -172,23 +172,26 @@ jobs:
           wait
           echo "Tools initialized successfully!"
 
-      - name: 📺 Clone & Inline Link Xiaomi Hardware Modules
+      - name: 📺 Inject Xiaomi Display Drivers into Core Tree
         run: |
-          echo "Cloning sm7435-modules inside the workspace..."
+          echo "Cloning sm7435-modules..."
           rm -rf kernel/xiaomi/sm7435-modules 2>/dev/null || true
           git clone --depth=1 "${{ env.kernel_modules_link }}" -b ${{ env.kernel_modules_branch }} kernel/xiaomi/sm7435-modules
 
-          echo "Injecting Display Techpack directly into the Kernel Core..."
           cd kernel/xiaomi/sm7435
           
-          # Καθαρίζουμε τυχόν generic/κενό φάκελο display
-          rm -rf techpack/display 2>/dev/null || true
-          mkdir -p techpack
+          # Εξαναγκάζουμε το build system να δει τον display driver ως εσωτερικό υποσύστημα drivers/
+          rm -rf drivers/video/techpack 2>/dev/null || true
+          mkdir -p drivers/video/techpack
           
-          # Δημιουργούμε τη γέφυρα μνήμης (Symlink) προς τους display drivers
-          ln -s ../../sm7435-modules/techpack/display ./techpack/display
+          # Αντιγράφουμε με hard copy όλο τονdisplay κώδικα μέσα στους core drivers
+          cp -r ../sm7435-modules/techpack/display/* drivers/video/techpack/
           
-          echo "✅ Display Techpack is now tightly coupled inside the core!"
+          # Εγχέουμε τις οδηγίες μεταγλώττισης στο επίσημο Makefile των drivers
+          echo "obj-y += techpack/" >> drivers/video/Makefile
+          echo "source \"drivers/video/techpack/Kconfig\"" >> drivers/video/Kconfig
+          
+          echo "✅ Display driver heavily injected into core drivers/video/ !"
 
       - name: Cache ccache-ECS binary
         uses: actions/cache@v4
@@ -421,7 +424,7 @@ jobs:
             echo "Kernel Image not found, build may have failed."
             exit 1
           fi
-          AK3_NAME=AnyKernel3_AOSP_5.10_Garnet_UserXP-Gem.zip
+          AK3_NAME=AnyKernel3_AOSP_5.10_Garnet_UserXP-Gem_${{ github.run_number }}.zip
           echo "ak3name=$AK3_NAME" >> $GITHUB_OUTPUT
 
       - name: 📤 Upload AnyKernel3
