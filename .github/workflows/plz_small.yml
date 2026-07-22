@@ -51,7 +51,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       ak3name: ${{ steps.create_zip.outputs.ak3name }}
     permissions:
@@ -174,10 +174,11 @@ jobs:
 
       - name: 📺 Clone & Patch Custom Xiaomi Modules
         run: |
-          echo "Pre-cloning custom Xiaomi sm7435-modules to bypass generic drivers..."
-          rm -rf sm7435-modules 2>/dev/null || true
-          git clone --depth=1 "${{ env.kernel_modules_link }}" -b ${{ env.kernel_modules_branch }} sm7435-modules
-          echo "✅ Modules aligned at sm7435-modules!"
+          echo "Aligning custom Xiaomi sm7435-modules inside the factory structure..."
+          rm -rf kernel/xiaomi/sm7435-modules 2>/dev/null || true
+          mkdir -p kernel/xiaomi
+          git clone --depth=1 "${{ env.kernel_modules_link }}" -b ${{ env.kernel_modules_branch }} kernel/xiaomi/sm7435-modules
+          echo "✅ Modules perfectly aligned at kernel/xiaomi/sm7435-modules!"
 
       - name: Cache ccache-ECS binary
         uses: actions/cache@v4
