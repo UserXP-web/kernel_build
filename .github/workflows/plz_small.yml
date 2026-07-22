@@ -368,8 +368,11 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
 
-          # [ΟΙ ΣΩΣΤΟΙ ΚΑΘΑΡΟΙ ΔΙΑΚΟΠΤΕΣ QUALCOMM MODULES]
+          # [ΟΙ ΣΩΣΤΟΙ ΕΡΓΟΣΤΑΣΙΑΚΟΙ ΔΙΑΚΟΠΤΕΣ QUALCOMM MODULES]
           export CONFIG_DRM_MSM=m
+          export CONFIG_DRM_MSM_SDE=m
+          export CONFIG_DRM_MSM_DSI=m
+          export CONFIG_DRM_MSM_DP=m
           export CONFIG_DISPLAY_BUILD=m
           export CONFIG_ARCH_PARROT=y
 
