@@ -324,18 +324,19 @@ jobs:
             exit 1
           fi
 
-      - name: 📦 Add build name (Dynamic Unique ID)
+      - name: 📦 Add build name & Disable Werror
         run: |
-          cd sm7435
-          
+          cd $GITHUB_WORKSPACE/sm7435          
           if [ -f "scripts/setlocalversion" ]; then
             sed -i 's/${scm_version}//' scripts/setlocalversion
-          fi
-          
+          fi          
           if [ -f "$GITHUB_WORKSPACE/kout/.config" ]; then
             sed -i '/CONFIG_LOCALVERSION=/d' $GITHUB_WORKSPACE/kout/.config
-            # Εισαγωγή του μοναδικού ID (π.χ. -FleurX-306)
             echo 'CONFIG_LOCALVERSION="-FleurX-${{ github.run_number }}"' >> $GITHUB_WORKSPACE/kout/.config
+            
+            # [ΚΡΙΣΙΜΟ FIX]: Απενεργοποίηση των Warnings-as-Errors για τον Clang 21
+            sed -i '/CONFIG_WERROR=/d' $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_WERROR=n" >> $GITHUB_WORKSPACE/kout/.config
           fi
 
       - name: 🔨 Build Kernel
