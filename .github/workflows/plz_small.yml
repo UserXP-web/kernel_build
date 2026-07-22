@@ -324,7 +324,7 @@ jobs:
             exit 1
           fi
 
-      - name: 📦 Add build name
+      - name: 📦 Add build name (Dynamic Unique ID)
         run: |
           cd kernel/xiaomi/sm7435
           
@@ -334,9 +334,8 @@ jobs:
           
           if [ -f "$GITHUB_WORKSPACE/kout/.config" ]; then
             sed -i '/CONFIG_LOCALVERSION=/d' $GITHUB_WORKSPACE/kout/.config
-            #sed -i '/CONFIG_LOCALVERSION_AUTO=/d' $GITHUB_WORKSPACE/kout/.config
-            echo 'CONFIG_LOCALVERSION="-FleurX"' >> $GITHUB_WORKSPACE/kout/.config
-            #echo "CONFIG_LOCALVERSION_AUTO=n" >> $GITHUB_WORKSPACE/kout/.config
+            # Εισαγωγή του μοναδικού ID (π.χ. -FleurX-306)
+            echo 'CONFIG_LOCALVERSION="-FleurX-${{ github.run_number }}"' >> $GITHUB_WORKSPACE/kout/.config
           fi
 
       - name: 🔨 Build Kernel
