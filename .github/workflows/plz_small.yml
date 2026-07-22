@@ -175,19 +175,23 @@ jobs:
       - name: 📺 Inject Xiaomi Display Drivers into Core Tree
         run: |
           echo "Cloning sm7435-modules..."
-          rm -rf kernel/xiaomi/sm7435-modules 2>/dev/null || true
-          git clone --depth=1 "${{ env.kernel_modules_link }}" -b ${{ env.kernel_modules_branch }} kernel/xiaomi/sm7435-modules
+          rm -rf $GITHUB_WORKSPACE/kernel/xiaomi/sm7435-modules 2>/dev/null || true
+          git clone --depth=1 "${{ env.kernel_modules_link }}" -b ${{ env.kernel_modules_branch }} $GITHUB_WORKSPACE/kernel/xiaomi/sm7435-modules
 
-          cd kernel/xiaomi/sm7435
+          # Δημιουργία του εσωτερικού φακέλου υποδοχής στους core drivers
+          rm -rf $GITHUB_WORKSPACE/kernel/xiaomi/sm7435/drivers/video/techpack 2>/dev/null || true
+          mkdir -p $GITHUB_WORKSPACE/kernel/xiaomi/sm7435/drivers/video/techpack
           
-          # Εξαναγκάζουμε το build system να δει τον display driver ως εσωτερικό υποσύστημα drivers/
-          rm -rf drivers/video/techpack 2>/dev/null || true
-          mkdir -p drivers/video/techpack
+          echo "Copying Display Driver files using absolute paths..."
+          # Ελέγχουμε αν η δομή έχει techpack/display ή αν είναι χύμα στη ρίζα και αντιγράφουμε ανάλογα
+          if [ -d "$GITHUB_WORKSPACE/kernel/xiaomi/sm7435-modules/techpack/display" ]; then
+            cp -r $GITHUB_WORKSPACE/kernel/xiaomi/sm7435-modules/techpack/display/* $GITHUB_WORKSPACE/kernel/xiaomi/sm7435/drivers/video/techpack/
+          else
+            cp -r $GITHUB_WORKSPACE/kernel/xiaomi/sm7435-modules/* $GITHUB_WORKSPACE/kernel/xiaomi/sm7435/drivers/video/techpack/
+          fi
           
-          # Αντιγράφουμε με hard copy όλο τονdisplay κώδικα μέσα στους core drivers
-          cp -r ../sm7435-modules/techpack/display/* drivers/video/techpack/
-          
-          # Εγχέουμε τις οδηγίες μεταγλώττισης στο επίσημο Makefile των drivers
+          # Εγχέουμε τις οδηγίες μεταγλώττισης στα core αρχεία
+          cd $GITHUB_WORKSPACE/kernel/xiaomi/sm7435
           echo "obj-y += techpack/" >> drivers/video/Makefile
           echo "source \"drivers/video/techpack/Kconfig\"" >> drivers/video/Kconfig
           
