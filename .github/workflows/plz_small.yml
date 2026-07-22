@@ -30,6 +30,7 @@ env:
   CLANG_LINK: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android16-qpr2-release/clang-r563880c.tar.gz"
   #CLANG_VERSION: "r584948"
   #CLANG_LINK: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/167e11df8c330bced88cdf5808f61f41d9eab330/clang-r584948.tar.gz"
+  Neutron_Clang_LINK: "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman"
   BUILD_TOOLS_LINK: "https://git.codelinaro.org/clo/la/kernel/prebuilts/build-tools.git"
   FINAL_CONFIG_LINK: "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_fleurx"
   #FINAL_CONFIG_LINK: "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_EvoX_a17"
@@ -93,7 +94,49 @@ jobs:
           path: kernel_workspace/build-tools
           key: codelinaro-build-tools-ks-kernel-lnx-4.0
 
-      - name: 📥 Install dependencies & Init Source
+      - name: 📥 Install Dependencies & Sync Neutron Clang Toolchain
+        run: |
+          rm -rf kernel/xiaomi/sm7435 kernel_workspace/out 2>/dev/null || true
+          mkdir -p kernel_workspace/build-tools
+          
+          sudo apt-get install -y --no-install-recommends aria2 libelf-dev dos2unix pahole cmake bc
+          
+          # Κατέβασμα και εγκατάσταση του Neutron Clang (Clang 21 + LTO + Polly)
+          mkdir -p kernel_workspace/neutron-clang
+          cd kernel_workspace/neutron-clang
+          curl -L "${{ env.Neutron_Clang_LINK }}" -o antman
+          chmod +x antman
+          ./antman -S=latest
+          cd $GITHUB_WORKSPACE
+
+          # Κατέβασμα Build Tools στο παρασκήνιο (Background)
+          if [ "${{ steps.buildtools-cache.outputs.cache-hit }}" != "true" ]; then
+            echo "Cache miss — cloning build-tools..."
+            git clone --depth=1 -b ks-kernel.lnx.4.0.r1-rel "${{ env.BUILD_TOOLS_LINK }}" kernel_workspace/build-tools
+          else
+            echo "build-tools restored from cache, skipping clone."
+          fi &
+          wait
+          echo "Tools initialized successfully!"
+
+      - name: 📥 Install Source
+        run: |
+          mkdir -p kernel/xiaomi
+          git clone --depth=1 "${{ env.kernel_link }}" -b ${{ env.kernel_branch }} kernel/xiaomi/sm7435 || { echo "❌ ERROR: Git clone failed!"; exit 1; }
+
+          echo "Removing ABI protection & dirty suffix..."
+          rm kernel/xiaomi/sm7435/abi_gki_protected_exports_* 2>/dev/null || true
+          rm kernel/xiaomi/sm7435/android/abi_gki_protected_exports_* 2>/dev/null || true
+          for f in kernel/xiaomi/sm7435/scripts/setlocalversion; do
+            if [ -f "$f" ]; then
+              sed -i 's/ -dirty//g' "$f"
+              sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' "$f"
+            fi
+          done
+          echo "Source initialized successfully!"
+      
+      - name: 📥 Install dependencies (old)
+        if: false
         run: |
           # Καθαρισμός φακέλων εργασίας πριν ξεκινήσει το κατέβασμα
           rm -rf kernel/xiaomi/sm7435 kernel_workspace/out 2>/dev/null || true
@@ -127,36 +170,7 @@ jobs:
 
           # Αναμονή για να ολοκληρωθούν ΟΛΑ τα παραπάνω background tasks
           wait
-
-          # ΕΚΤΕΛΕΣΗ CLONE ΣΤΟ ΠΡΟΣΚΗΝΙΟ (Foreground) για άμεση καταγραφή σφαλμάτων
-          echo "Cloning source repository..."
-          mkdir -p kernel/xiaomi
-          git clone --depth=1 "${{env.kernel_link }}" -b ${{ env.kernel_branch }} kernel/xiaomi/sm7435 || { echo "❌ ERROR: Git clone failed!"; exit 1; }
-          
-          #echo "🌐 Initialize kernel repository..."
-          #mkdir -p android && cd android
-          #mkdir -p kernel_workspace && cd kernel_workspace
-          #MANIFEST_URL="https://github.com/UserXP-web/kernel_build" # ${{ env.manifest_url }}
-          #MANIFEST_BRANCH="main" # ${{ env.manifest_branch }}
-          #MANIFEST_XML="manifest/zylhdrXP.xml" # manifest/${{ inputs.MANIFEST_selection }}.xml
-          #echo "~ $MANIFEST_URL ^^^ $MANIFEST_BRANCH --- $MANIFEST_XML"        
-          #repo init --depth=1 -u $MANIFEST_URL -b $MANIFEST_BRANCH -m $MANIFEST_XML
-          #echo "🔄 Synchronize the codebase (using $(nproc --all) threads)..."
-          #repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle --force-sync
-          #echo "✅ Kernel source code cloning complete"
-          #cd $GITHUB_WORKSPACE
-
-          echo "Removing ABI protection & dirty suffix..."
-          rm kernel/xiaomi/sm7435/abi_gki_protected_exports_* 2>/dev/null || true
-          rm kernel/xiaomi/sm7435/android/abi_gki_protected_exports_* 2>/dev/null || true
-          for f in kernel/xiaomi/sm7435/scripts/setlocalversion; do
-            if [ -f "$f" ]; then
-              sed -i 's/ -dirty//g' "$f"
-              sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' "$f"
-            fi
-          done
-
-          echo "Source and tools initialized successfully!"
+          echo "Tools initialized successfully!"
 
       - name: 📺 Clone & Patch Custom Xiaomi Modules
         run: |
@@ -164,18 +178,6 @@ jobs:
           rm -rf sm7435-modules 2>/dev/null || true
           git clone --depth=1 "${{ env.kernel_modules_link }}" -b ${{ env.kernel_modules_branch }} sm7435-modules
           echo "✅ Modules aligned at sm7435-modules!"
-
-          echo "🛠️ Injecting Null-Pointer & Garbage Data Bypasses (Try 1.304)..."
-          # 1. Παράκαμψη του NULL crash και εξαναγκασμός επιστροφής επιτυχίας στο panel registration
-          find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/return PTR_ERR(prim_panel);/return 0;/g' {} +
-          find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/if (IS_ERR_OR_NULL(prim_panel))/if (0)/g' {} +
-          find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/if (!prim_panel)/if (0)/g' {} +
-          find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/if (PTR_ERR(prim_panel))/if (0)/g' {} +
-          # 2. Force drop του DRM Master Verification Lock
-          find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/if (!drm_is_current_master/if (0 \&\& !drm_is_current_master/g' {} +
-          find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/ret = drm_setmaster_ioctl/ret = 0; \/\/ drm_setmaster_ioctl/g' {} +
-          find sm7435-modules/qcom/opensource/display-drivers/ -name "*.c" -exec sed -i 's/return -EPERM;/return 0;/g' {} +
-
 
       - name: Cache ccache-ECS binary
         uses: actions/cache@v4
@@ -186,7 +188,6 @@ jobs:
 
       - name: Build & Install ccache-ECS
         run: |
-          #rm -rf /tmp/ccache-ecs /tmp/ccache-ecs-bin 2>/dev/null || true # WE delete this line after this run. Gem is your job to remind me!!!
           if [ -f /tmp/ccache-ecs-bin/ccache ]; then
             echo "ECS binary cached, skipping build"
             sudo cp /tmp/ccache-ecs-bin/ccache /usr/local/bin/ccache
@@ -287,51 +288,27 @@ jobs:
         run: |
           cd kernel/xiaomi/sm7435
           
-          # 1. Βασικές ρυθμίσεις απόδοσης
+          # 1. Βασικές ρυθμίσεις απόδοσης και LTO
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> arch/arm64/configs/gki_defconfig
-          echo "CONFIG_HEADERS_INSTALL=n"               >> arch/arm64/configs/gki_defconfig
-          echo "CONFIG_MODULES=y"                        >> arch/arm64/configs/gki_defconfig
-          echo "CONFIG_IKCONFIG=y"                       >> arch/arm64/configs/gki_defconfig
-          echo "CONFIG_IKCONFIG_PROC=y"                  >> arch/arm64/configs/gki_defconfig
           
-          echo "CONFIG_LLVM_POLLY=y"                    >> arch/arm64/configs/gki_defconfig
-          echo "CONFIG_LD_DEAD_CODE_DATA_ELIMINATION=y" >> arch/arm64/configs/gki_defconfig
-
-          # [ΤΟ ΜΥΣΤΙΚΟ ΓΙΑ AOSP]: Απενεργοποίηση HyperOS / Xiaomi Hooks που προκαλούν Bootloop
-          echo "# CONFIG_XIAOMI_MI_LOG is not set"        >> arch/arm64/configs/gki_defconfig
-          echo "# CONFIG_XIAOMI_BOOT_PROFILER is not set" >> arch/arm64/configs/gki_defconfig
-          echo "# CONFIG_RESERVE_MEM_DUMP is not set"     >> arch/arm64/configs/gki_defconfig
-          
-          # Εξασφάλιση συμβατότητας με AOSP Binder (Android 16 init)
-          echo "CONFIG_ANDROID_BINDER_IPC=y"              >> arch/arm64/configs/gki_defconfig
-          echo "CONFIG_ANDROID_BINDERFS=y"                >> arch/arm64/configs/gki_defconfig
-          echo "CONFIG_ANDROID_BINDER_DEVICES=\"binder,hwbinder,vndbinder\"" >> arch/arm64/configs/gki_defconfig
-
-          # [ΤΟ ΑΠΟΛΥΤΟ ΜΥΣΤΙΚΟ ΓΙΑ ANDROID 16 BOOT]
-          echo "CONFIG_BOOT_CONFIG=y"                   >> arch/arm64/configs/gki_defconfig
-          echo "CONFIG_CMDLINE_BOOTCONFIG=y"             >> arch/arm64/configs/gki_defconfig          
-          # Εξασφάλιση ότι το Page Size παραμένει στα 4096 (όπως ζητάει η ROM)
-          echo "CONFIG_ARM64_4K_PAGES=y"                 >> arch/arm64/configs/gki_defconfig
-          echo "# CONFIG_ARM64_16K_PAGES is not set"     >> arch/arm64/configs/gki_defconfig
-          echo "# CONFIG_ARM64_64K_PAGES is not set"     >> arch/arm64/configs/gki_defconfig
-
-          # 2. Ρύθμιση του LTO
-          if [[ "${{ github.event.inputs.lto_type }}" == "none" ]]; then
+          if [[ "${{ inputs.lto_type }}" == "none" ]]; then
             echo "CONFIG_LTO_CLANG_NONE=y" >> arch/arm64/configs/gki_defconfig
-          elif [[ "${{ github.event.inputs.lto_type }}" == "full" ]]; then
+          elif [[ "${{ inputs.lto_type }}" == "full" ]]; then
             echo "CONFIG_LTO_CLANG_FULL=y" >> arch/arm64/configs/gki_defconfig
           else
             echo "CONFIG_LTO_CLANG_THIN=y" >> arch/arm64/configs/gki_defconfig
           fi
 
-          # 3. Εκτέλεση του Merge των Defconfigs
-          mkdir -p ../out
+          # 2. Εκτέλεση του επίσημου εργοστασιακού Merge Config της Xiaomi/Qualcomm
+          mkdir -p $GITHUB_WORKSPACE/kout
           ARCH=arm64 ./scripts/kconfig/merge_config.sh \
-            -O ../out \
+            -O $GITHUB_WORKSPACE/kout \
             arch/arm64/configs/gki_defconfig \
+            arch/arm64/configs/vendor/parrot_GKI.config \
             arch/arm64/configs/vendor/garnet_GKI.config
 
       - name: 🧩 Setup FleurX Config Base
+        if: true
         run: |
           mkdir -p $GITHUB_WORKSPACE/kout
           mkdir -p $GITHUB_WORKSPACE/ldcache_garnet
@@ -365,7 +342,8 @@ jobs:
         run: |
           WORKDIR="$(pwd)"
           export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
-          export PATH="$WORKDIR/kernel_workspace/clang-${{ env.CLANG_VERSION }}/bin:$WORKDIR/kernel_workspace/build-tools/linux-x86/bin:$PATH"
+          export PATH="$GITHUB_WORKSPACE/kernel_workspace/neutron-clang/bin:$GITHUB_WORKSPACE/kernel_workspace/build-tools/linux-x86/bin:$PATH"
+          #export PATH="$WORKDIR/kernel_workspace/clang-${{ env.CLANG_VERSION }}/bin:$WORKDIR/kernel_workspace/build-tools/linux-x86/bin:$PATH"
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
           export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
           export CCACHE_IS_KERNEL_COMPILING=true
