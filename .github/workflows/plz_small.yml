@@ -344,22 +344,15 @@ jobs:
             sed -i 's/const char \*name;/const char \*name = NULL;/g' "$HAPTICS_FILE"
           fi
 
-          # [ΚΡΙΣΙΜΟ OVERRIDE ΓΙΑ ΤΟ DEV/MI_DISPLAY]
-          echo "CONFIG_MI_DISPLAY_FEATURE=y" >> $GITHUB_WORKSPACE/kout/.config
-          echo "CONFIG_MSM_MMRM=y" >> $GITHUB_WORKSPACE/kout/.config
-          echo "CONFIG_DRM_MI_DISPLAY=y" >> $GITHUB_WORKSPACE/kout/.config
-
-      - name: 🔨 Build Kernel
+      - name: 🔨 Build Kernel (Try 1.311 Environment Fix)
         run: |
           WORKDIR="$(pwd)"
           export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
           export PATH="$GITHUB_WORKSPACE/kernel_workspace/neutron-clang/bin:$GITHUB_WORKSPACE/kernel_workspace/build-tools/linux-x86/bin:$PATH"
-          #export PATH="$WORKDIR/kernel_workspace/clang-${{ env.CLANG_VERSION }}/bin:$WORKDIR/kernel_workspace/build-tools/linux-x86/bin:$PATH"
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
           export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
           export CCACHE_IS_KERNEL_COMPILING=true
 
-          # Μπαίνουμε στον flat φάκελο
           cd $GITHUB_WORKSPACE/sm7435
 
           echo '#!/bin/bash' > ld-wrapper
@@ -375,30 +368,19 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
 
-          # 1. Καθαρή ευθυγράμμιση
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 \
-            O=$GITHUB_WORKSPACE/kout \
-            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
-            olddefconfig
+          # [ΟΙ ΚΡΥΦΟΙ ΔΙΑΚΟΠΤΕΣ ΤΗΣ QUALCOMM/XIAOMI]
+          export CONFIG_DRM_MSM=y
+          export CONFIG_DISPLAY_BUILD=m
+          export CONFIG_ARCH_PARROT=y
 
-          # 2. Μεταγλώττιση του κεντρικού πυρήνα (Image)
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 \
-            O=$GITHUB_WORKSPACE/kout \
-            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
-            Image
+          # 1. Ευθυγράμμιση
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- olddefconfig
 
-          # [ΤΟ ΧΑΜΕΝΟ ΚΛΕΙΔΙ]: Μεταγλώττιση των Qualcomm Display/Audio/Video Μodules
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 \
-            O=$GITHUB_WORKSPACE/kout \
-            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
-            modules
-          echo "Kernel and Modules Compilation Complete!"
+          # 2. Μεταγλώττιση Πυρήνα
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- Image
 
-          # [ΚΡΙΣΙΜΟ QUALCOMM STEP]: Export των Techpack Headers για να μην γίνει corrupt η μνήμη
-          #make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 \
-          #  O=$GITHUB_WORKSPACE/kout \
-          #  CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
-          #  headers_install
+          # 3. Μεταγλώττιση Modules (Τώρα θα χτιστούν οι display drivers!)
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- modules
 
       - name: 📦 Save New CCache
         if: success()
