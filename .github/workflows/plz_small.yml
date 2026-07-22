@@ -344,6 +344,11 @@ jobs:
             sed -i 's/const char \*name;/const char \*name = NULL;/g' "$HAPTICS_FILE"
           fi
 
+          # [ΚΡΙΣΙΜΟ OVERRIDE ΓΙΑ ΤΟ DEV/MI_DISPLAY]
+          echo "CONFIG_MI_DISPLAY_FEATURE=y" >> $GITHUB_WORKSPACE/kout/.config
+          echo "CONFIG_MSM_MMRM=y" >> $GITHUB_WORKSPACE/kout/.config
+          echo "CONFIG_DRM_MI_DISPLAY=y" >> $GITHUB_WORKSPACE/kout/.config
+
       - name: 🔨 Build Kernel
         run: |
           WORKDIR="$(pwd)"
