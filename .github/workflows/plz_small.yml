@@ -364,9 +364,21 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
 
-          # Ευθυγράμμιση και compile
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- olddefconfig
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- Image
+          # 1. Καθαρή ευθυγράμμιση του .config
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 \
+            O=$GITHUB_WORKSPACE/kout \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            olddefconfig
+          # [ΚΡΙΣΙΜΟ QUALCOMM STEP]: Export των Techpack Headers για να μην γίνει corrupt η μνήμη
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 \
+            O=$GITHUB_WORKSPACE/kout \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            headers_install
+          # 2. Μεταγλώττιση του Image
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 \
+            O=$GITHUB_WORKSPACE/kout \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            Image
           echo "Kernel Compilation Complete!"
 
       - name: 📦 Save New CCache
