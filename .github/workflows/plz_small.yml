@@ -368,8 +368,8 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
 
-          # [ΟΙ ΚΡΥΦΟΙ ΔΙΑΚΟΠΤΕΣ ΤΗΣ QUALCOMM/XIAOMI]
-          export CONFIG_DRM_MSM=y
+          # [ΟΙ ΣΩΣΤΟΙ ΚΑΘΑΡΟΙ ΔΙΑΚΟΠΤΕΣ QUALCOMM MODULES]
+          export CONFIG_DRM_MSM=m
           export CONFIG_DISPLAY_BUILD=m
           export CONFIG_ARCH_PARROT=y
 
