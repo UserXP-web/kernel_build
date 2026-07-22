@@ -368,13 +368,18 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
 
-          # [ΟΙ ΣΩΣΤΟΙ ΕΡΓΟΣΤΑΣΙΑΚΟΙ ΔΙΑΚΟΠΤΕΣ QUALCOMM MODULES]
-          export CONFIG_DRM_MSM=m
-          export CONFIG_DRM_MSM_SDE=m
-          export CONFIG_DRM_MSM_DSI=m
-          export CONFIG_DRM_MSM_DP=m
-          export CONFIG_DISPLAY_BUILD=m
+          # [ΟΙ ΑΥΘΕΝΤΙΚΟΙ ΣΤΑΤΙΚΟΙ ΔΙΑΚΟΠΤΕΣ ΤΗΣ QUALCOMM]
+          # Αναγκάζουμε το display techpack να ραφτεί statically ΜΕΣΑ στο Image
+          export CONFIG_DRM_MSM=y
+          export CONFIG_DRM_MSM_SDE=y
+          export CONFIG_DRM_MSM_DSI=y
+          export CONFIG_DRM_MSM_DP=y
+          export CONFIG_DISPLAY_BUILD=y
           export CONFIG_ARCH_PARROT=y
+          # [Η ΓΕΦΥΡΑ ΓΙΑ ΤΑ UNDEFINED SYMBOLS]
+          # Ενεργοποιούμε στατικά τα security subsystems για να κλείσει το vmlinux link
+          export CONFIG_QCOM_SCM=y
+          export CONFIG_QCOM_COMMAND_DB=y
 
           # 1. Ευθυγράμμιση
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- olddefconfig
