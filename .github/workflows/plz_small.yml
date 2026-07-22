@@ -344,7 +344,40 @@ jobs:
             sed -i 's/const char \*name;/const char \*name = NULL;/g' "$HAPTICS_FILE"
           fi
 
+      - name: 🔨 Build Kernel (The Pure FleurX Way)
+        run: |
+          WORKDIR="$(pwd)"
+          export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
+          export PATH="$GITHUB_WORKSPACE/kernel_workspace/neutron-clang/bin:$GITHUB_WORKSPACE/kernel_workspace/build-tools/linux-x86/bin:$PATH"
+          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
+          export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
+          export CCACHE_IS_KERNEL_COMPILING=true
+
+          cd $GITHUB_WORKSPACE/sm7435
+
+          echo '#!/bin/bash' > ld-wrapper
+          echo 'ld.lld "$@" --lto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --lto-partitions=2' >> ld-wrapper
+          chmod +x ld-wrapper
+
+          export CC="ccache clang"
+          export LD="$(pwd)/ld-wrapper"
+          export HOSTLD="$(pwd)/ld-wrapper"
+          export AR=llvm-ar
+          export NM=llvm-nm
+          export OBJCOPY=llvm-objcopy
+          export OBJDUMP=llvm-objdump
+          export STRIP=llvm-strip
+
+          # 1. Καθαρή ευθυγράμμιση του .config (Χωρίς κανένα export)
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- olddefconfig
+
+          # 2. Μεταγλώττιση ΜΟΝΟ του Image (Όπως το FleurX)
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- Image
+
+          echo "Kernel Compilation Complete!"
+
       - name: 🔨 Build Kernel (Try 1.311 Environment Fix)
+        if: false
         run: |
           WORKDIR="$(pwd)"
           export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
