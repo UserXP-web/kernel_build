@@ -344,6 +344,17 @@ jobs:
             sed -i 's/const char \*name;/const char \*name = NULL;/g' "$HAPTICS_FILE"
           fi
 
+          # [ΑΠΕΝΕΡΓΟΠΟΙΗΣΗ MOD SIGNING & ENFORCEMENT]
+          # Επιτρέπουμε στον πυρήνα να φορτώσει τους drivers της ROM χωρίς X.509 mismatch
+          if [ -f "$GITHUB_WORKSPACE/kout/.config" ]; then
+            sed -i '/CONFIG_MODULE_SIG=/d' $GITHUB_WORKSPACE/kout/.config
+            sed -i '/CONFIG_MODULE_SIG_FORCE=/d' $GITHUB_WORKSPACE/kout/.config
+            sed -i '/CONFIG_MODULE_SIG_ALL=/d' $GITHUB_WORKSPACE/kout/.config
+            
+            echo "CONFIG_MODULE_SIG=n" >> $GITHUB_WORKSPACE/kout/.config
+            echo "CONFIG_MODULE_SIG_FORCE=n" >> $GITHUB_WORKSPACE/kout/.config
+          fi
+
       - name: 🔨 Build Kernel (The Pure FleurX Way)
         run: |
           WORKDIR="$(pwd)"
