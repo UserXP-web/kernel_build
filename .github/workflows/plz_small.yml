@@ -366,8 +366,14 @@ jobs:
           # 1. Configuration Check
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y VIDEO_ROOT=techpack/video olddefconfig
 
-          # 2. Compile Monolithic Image
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y VIDEO_ROOT=techpack/video Image
+      - name: 📤 Upload .config for Verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-kernel-config
+          path: ${{ github.workspace }}/kout/.config
+          
+          ## 2. Compile Monolithic Image
+          #make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y VIDEO_ROOT=techpack/video Image
 
       - name: 📦 Save New CCache
         if: success()
