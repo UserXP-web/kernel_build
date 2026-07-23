@@ -53,7 +53,7 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     outputs:
-      ak3name: ${{ steps.create_zip.outputs.ak3name }}
+      ak3name: ${{ steps.prepare_zip.outputs.ak3name }}
     permissions:
       actions: write
       contents: read
@@ -439,32 +439,36 @@ jobs:
           path: ${{ env.LDCACHE_DIR }}
           key: lto-cache-${{ runner.os }}-${{ github.ref_name }}-${{ github.run_id }}
 
-      - name: 🧠 ~Package AK3 ZIP
-        id: create_zip
+      - name: 🧠 ~Prepare AK3 ZIP
+        id: prepare_zip
         run: |
-          cd kernel_workspace
+          cd $GITHUB_WORKSPACE/kernel_workspace
           rm -rf AnyKernel3 2>/dev/null || true
           git clone --depth=1 "${{ env.AK3_LINK }}" AnyKernel3
           rm -rf AnyKernel3/.git
+          
           cd AnyKernel3
-          # Αντιγραφή του Kernel Image
+          # Αντιγραφή του Kernel Image ως αρχείο Image στη ρίζα του AnyKernel3
           cp $GITHUB_WORKSPACE/kout/arch/arm64/boot/Image ./Image
           
-          # [ΤΟ ΣΩΣΤΟ PATCH]: Ρίχνουμε τα 301 modules χύμα στον κεντρικό φάκελο modules/
+          # [ΤΟ ΑΠΟΛΥΤΟ ΦΙΛΤΡΟ]: Μαζεύουμε ΜΟΝΟ τους εργοστασιακούς drivers της Xiaomi
           mkdir -p ./modules
-          find $GITHUB_WORKSPACE/kout/ -name "*.ko" -exec cp {} ./modules/ \;
+          find $GITHUB_WORKSPACE/kout/drivers/video/ -name "*.ko" -exec cp {} ./modules/ \; 2>/dev/null || true
+          find $GITHUB_WORKSPACE/kout/drivers/input/touchscreen/ -name "*.ko" -exec cp {} ./modules/ \; 2>/dev/null || true
 
           if [[ ! -f ./Image ]]; then
             echo "Kernel Image not found, build may have failed."
             exit 1
           fi
-          AK3_NAME=AnyKernel3_AOSP_5.10_Garnet_UserXP-Gem_${{ github.run_number }}.zip
+          
+          # Ορίζουμε το δυναμικό όνομα που θα χρησιμοποιήσει το upload-artifact
+          AK3_NAME=AnyKernel3_AOSP_5.10_Garnet_UserXP-Gem_${{ github.run_number }}
           echo "ak3name=$AK3_NAME" >> $GITHUB_OUTPUT
 
       - name: 📤 Upload AnyKernel3
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.create_zip.outputs.ak3name }}
+          name: ${{ steps.prepare_zip.outputs.ak3name }}
           path: ${{ github.workspace }}/kernel_workspace/AnyKernel3/**
           if-no-files-found: ignore
           compression-level: 9
