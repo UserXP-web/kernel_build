@@ -363,11 +363,11 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
 
-          # 1. Ευθυγράμμιση του .config με το flag TECHPACK=y
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y olddefconfig
+          # 1. Configuration Check
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y VIDEO_ROOT=techpack/video olddefconfig
 
-          # 2. Μεταγλώττιση του Image (Μονολιθικό build)
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y Image
+          # 2. Compile Monolithic Image
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y VIDEO_ROOT=techpack/video Image
 
       - name: 📦 Save New CCache
         if: success()
