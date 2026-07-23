@@ -359,6 +359,9 @@ jobs:
           export CONFIG_DRM_MSM=y
           export CONFIG_DRM_MSM_DSI=y
           export CONFIG_DRM_MSM_SDE=y
+          # [Η ΓΕΦΥΡΑ ΑΣΦΑΛΕΙΑΣ ΓΙΑ ΤΟΝ LINKER]
+          export CONFIG_QCOM_SCM=y
+          export CONFIG_QCOM_COMMAND_DB=y
 
           # 1. Ευθυγράμμιση του .config
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- olddefconfig
