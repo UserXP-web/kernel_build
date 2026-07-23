@@ -337,19 +337,10 @@ jobs:
             echo 'CONFIG_LOCALVERSION="-FleurX-${{ github.run_number }}"' >> $GITHUB_WORKSPACE/kout/.config
           fi
 
-          # Αρχικοποίηση της μεταβλητής name για να μην χτυπήσει το τοπικό script
           HAPTICS_FILE="drivers/input/misc/qcom-hv-haptics.c"
           if [ -f "$HAPTICS_FILE" ]; then
             echo "Patching uninitialized variable inside qcom-hv-haptics.c..."
             sed -i 's/const char \*name;/const char \*name = NULL;/g' "$HAPTICS_FILE"
-          fi
-
-          # [ΤΟ ΑΠΟΛΥΤΟ OVERRIDE ΓΙΑ ΤΟ DEV/MI_DISPLAY]
-          if [ -f "$GITHUB_WORKSPACE/kout/.config" ]; then
-            echo "Enforcing Xiaomi Touchfeature statically into Image..."
-            sed -i '/CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE=/d' $GITHUB_WORKSPACE/kout/.config
-            sed -i '/CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE is not set/d' $GITHUB_WORKSPACE/kout/.config
-            echo "CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE=y" >> $GITHUB_WORKSPACE/kout/.config
           fi
 
       - name: 🔨 Build Kernel (The Pure FleurX Way)
@@ -376,11 +367,14 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
 
-          # 1. Καθαρή ευθυγράμμιση του .config (Χωρίς κανένα export)
+          # 1. Ευθυγράμμιση
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- olddefconfig
 
-          # 2. Μεταγλώττιση ΜΟΝΟ του Image (Όπως το FleurX)
+          # 2. Compile Πυρήνα
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- Image
+
+          # 3. Compile Modules
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- modules
 
           echo "Kernel Compilation Complete!"
 
@@ -456,9 +450,9 @@ jobs:
           # Αντιγραφή του Kernel Image
           cp $GITHUB_WORKSPACE/kout/arch/arm64/boot/Image ./Image
           
-          ## [ΤΟ ΣΩΣΤΟ PATCH]: Ρίχνουμε τα 301 modules χύμα στον κεντρικό φάκελο modules/
-          #mkdir -p ./modules
-          #find $GITHUB_WORKSPACE/kout/ -name "*.ko" -exec cp {} ./modules/ \;
+          # [ΤΟ ΣΩΣΤΟ PATCH]: Ρίχνουμε τα 301 modules χύμα στον κεντρικό φάκελο modules/
+          mkdir -p ./modules
+          find $GITHUB_WORKSPACE/kout/ -name "*.ko" -exec cp {} ./modules/ \;
 
           if [[ ! -f ./Image ]]; then
             echo "Kernel Image not found, build may have failed."
