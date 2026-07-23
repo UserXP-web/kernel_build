@@ -330,25 +330,29 @@ jobs:
             sed -i 's/const char \*name;/const char \*name = NULL;/g' "$HAPTICS_FILE"
           fi
 
-      - name: 🔨 Build Kernel (The Pure FleurX Structural Alignment)
+      - name: 🔨 Build Kernel
         run: |
           WORKDIR="$(pwd)"
-          
-          # [ΚΡΙΣΙΜΟ COMPILER ALIGNMENT]: Αφαιρούμε τα επιθετικά padding optimizations
           export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
-          
           export PATH="$GITHUB_WORKSPACE/kernel_workspace/neutron-clang/bin:$GITHUB_WORKSPACE/kernel_workspace/build-tools/linux-x86/bin:$PATH"
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
           export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
           export CCACHE_IS_KERNEL_COMPILING=true
 
+          # Μπαίνουμε στη ρίζα του πυρήνα
           cd $GITHUB_WORKSPACE/sm7435
+
+          # [ΤΟ ΣΩΣΤΟ ΣΗΜΕΙΟ]: Γεφυρώνουμε τα modules της Xiaomi μέσα στο techpack/
+          # Αφαιρούμε τυχόν παλιά placeholders και φτιάχνουμε τους συνδέσμους
+          rm -rf techpack/display techpack/audio techpack/video 2>/dev/null || true
+          ln -s $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/display-drivers ./techpack/display
+          ln -s $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/audio-kernel ./techpack/audio
+          ln -s $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/video-kernel ./techpack/video
 
           echo '#!/bin/bash' > ld-wrapper
           echo 'ld.lld "$@" --lto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --lto-partitions=2' >> ld-wrapper
           chmod +x ld-wrapper
 
-          # Χρησιμοποιούμε καθαρά LLVM εργαλεία χωρίς κρυφά flags
           export CC="ccache clang"
           export LD="$(pwd)/ld-wrapper"
           export HOSTLD="$(pwd)/ld-wrapper"
@@ -358,14 +362,11 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
 
-          # 1. Καθαρή ευθυγράμμιση του .config (Όπως το FleurX - ΧΩΡΙΣ EXPORTS)
+          # 1. Ευθυγράμμιση του .config (Τώρα η find θα διαβάσει τα symlinks!)
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- olddefconfig
 
-          # 2. Μεταγλώττιση του Image
+          # 2. Μεταγλώττιση του Image (Μονολιθικό build)
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- Image
-
-          # 3. Μεταγλώττιση των Modules (Μόνο για Touch)
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- modules
 
       - name: 📦 Save New CCache
         if: success()
