@@ -363,14 +363,14 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
 
-          # [DYNAMIC CONFIG PATCH]: Run 130 - Κρατάμε ΜΟΝΟ τον ήχο και αφαιρούμε το βίαιο DRM_MSM για μείωση μεγέθους
-          echo "Injecting Core Audio flags..."          
-          sed -i '/CONFIG_SND_SOC_QCOM/d' $GITHUB_WORKSPACE/kout/.config; echo "CONFIG_SND_SOC_QCOM=y" >> $GITHUB_WORKSPACE/kout/.config
+          # [DYNAMIC CONFIG PATCH]: Run 131 - Μόνο η Οθόνη inline για τέλεια ευθυγράμμιση μεγέθους στα 43.0MB
+          echo "Injecting ONLY Qualcomm Display core flags..."          
+          sed -i '/CONFIG_DRM_MSM/d' $GITHUB_WORKSPACE/kout/.config; echo "CONFIG_DRM_MSM=y" >> $GITHUB_WORKSPACE/kout/.config
 
           # 1. Configuration Check
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y DISPLAY_ROOT=techpack/display VIDEO_ROOT=techpack/video AUDIO_ROOT=techpack/audio olddefconfig
 
-          # 2. Compile Monolithic Image (Καθαρό Image για έλεγχο μεγέθους)
+          # 2. Compile Monolithic Image (Καθαρό Image)
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y DISPLAY_ROOT=techpack/display VIDEO_ROOT=techpack/video AUDIO_ROOT=techpack/audio Image
 
       - name: 📦 Save New CCache
