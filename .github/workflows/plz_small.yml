@@ -354,9 +354,11 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
 
-          # [Ο ΜΟΝΑΔΙΚΟΣ ΕΡΓΟΣΤΑΣΙΑΚΟΣ ΔΙΑΚΟΠΤΗΣ]
-          # Αναγκάζει το out-of-tree Makefile να χτίσει τους Display Drivers της Xiaomi ως modules
-          export CONFIG_DISPLAY_BUILD=m
+          # [ΟΙ ΣΩΣΤΟΙ ΣΤΑΤΙΚΟΙ ΔΙΑΚΟΠΤΕΣ QUALCOMM DISPLAY]
+          # Αναγκάζουμε το techpack display να χτιστεί inline/static μέσα στο Image
+          export CONFIG_DRM_MSM=y
+          export CONFIG_DRM_MSM_DSI=y
+          export CONFIG_DRM_MSM_SDE=y
 
           # 1. Ευθυγράμμιση του .config
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- olddefconfig
