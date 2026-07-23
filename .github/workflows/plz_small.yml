@@ -330,7 +330,7 @@ jobs:
             sed -i 's/const char \*name;/const char \*name = NULL;/g' "$HAPTICS_FILE"
           fi
 
-      - name: 🔨 Build Kernel (Static Monolithic Inline)
+      - name: 🔨 Build Kernel (Static Monolithic Inline - Try 128)
         run: |
           WORKDIR="$(pwd)"
           export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
@@ -364,47 +364,18 @@ jobs:
           export STRIP=llvm-strip
 
           # [DYNAMIC CONFIG PATCH]: Βίαιος καθαρισμός και ενεργοποίηση των Qualcomm subsystems ΠΡΙΝ την olddefconfig
-          echo "Injecting Qualcomm Multimedia core flags..."          
+          echo "Injecting Qualcomm Multimedia core flags & Disabling Touch..."          
           sed -i '/CONFIG_DRM_MSM/d' $GITHUB_WORKSPACE/kout/.config; echo "CONFIG_DRM_MSM=y" >> $GITHUB_WORKSPACE/kout/.config
           sed -i '/CONFIG_SND_SOC_QCOM/d' $GITHUB_WORKSPACE/kout/.config; echo "CONFIG_SND_SOC_QCOM=y" >> $GITHUB_WORKSPACE/kout/.config
           sed -i '/CONFIG_VIDEO_QCOM_VENUS/d' $GITHUB_WORKSPACE/kout/.config; echo "CONFIG_VIDEO_QCOM_VENUS=y" >> $GITHUB_WORKSPACE/kout/.config
-          #sed -i '/CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE/d' $GITHUB_WORKSPACE/kout/.config; echo "CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE=y" >> $GITHUB_WORKSPACE/kout/.config
+          
+          # [ΑΠΕΝΕΡΓΟΠΟΙΗΣΗ TOUCH]: Πλήρες κλείσιμο του Xiaomi touch driver για αποφυγή του early panic
+          sed -i '/CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE/d' $GITHUB_WORKSPACE/kout/.config; echo "# CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE is not set" >> $GITHUB_WORKSPACE/kout/.config
 
-          # 1. Configuration Check με όλες τις Qualcomm Multimedia διαδρομές
+          # 1. Configuration Check
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y DISPLAY_ROOT=techpack/display VIDEO_ROOT=techpack/video AUDIO_ROOT=techpack/audio olddefconfig
 
-          # [TO ΚΟΛΠΟ]: Αντιγραφή του κρυφού .config σε φανερό αρχείο για να το πάρει το Artifact
-          cp $GITHUB_WORKSPACE/kout/.config $GITHUB_WORKSPACE/kout/fleurx_OUTPUT_config.txt
-
-      - name: 📤 Upload Build Folder for Verification
-        uses: actions/upload-artifact@v4
-        with:
-          name: generated-kernel-config
-          path: ${{ github.workspace }}/kout/
-
-      - name: 🔨 Build Kernel 2nd part (Static Monolithic Inline)
-        run: |
-          WORKDIR="$(pwd)"
-          export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
-          export PATH="$GITHUB_WORKSPACE/kernel_workspace/neutron-clang/bin:$GITHUB_WORKSPACE/kernel_workspace/build-tools/linux-x86/bin:$PATH"
-          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
-          export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
-          export CCACHE_IS_KERNEL_COMPILING=true
-
-          # Ξαναμπαίνουμε στη ρίζα του πυρήνα (sm7435) λόγω νέου session
-          cd $GITHUB_WORKSPACE/sm7435
-
-          # Επανεξαγωγή των compilers για το νέο shell
-          export CC="ccache clang"
-          export LD="$(pwd)/ld-wrapper"
-          export HOSTLD="$(pwd)/ld-wrapper"
-          export AR=llvm-ar
-          export NM=llvm-nm
-          export OBJCOPY=llvm-objcopy
-          export OBJDUMP=llvm-objdump
-          export STRIP=llvm-strip
-
-          # 2. Compile Monolithic Image με όλες τις Qualcomm Multimedia διαδρομές
+          # 2. Compile Monolithic Image (Άμεση εκτέλεση στο ίδιο session)
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y DISPLAY_ROOT=techpack/display VIDEO_ROOT=techpack/video AUDIO_ROOT=techpack/audio Image
 
       - name: 📦 Save New CCache
