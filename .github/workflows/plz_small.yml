@@ -372,6 +372,9 @@ jobs:
           # 1. Configuration Check
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y VIDEO_ROOT=techpack/video olddefconfig
 
+          # [ΤΟ ΚΟΛΠΟ]: Αντιγραφή του κρυφού .config σε φανερό αρχείο για να το πάρει το Artifact
+          cp $GITHUB_WORKSPACE/kout/.config $GITHUB_WORKSPACE/kout/fleurx_OUTPUT_config.txt
+
       - name: 📤 Upload Build Folder for Verification
         uses: actions/upload-artifact@v4
         with:
