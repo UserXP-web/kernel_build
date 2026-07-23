@@ -342,13 +342,13 @@ jobs:
           # Μπαίνουμε στη ρίζα του πυρήνα (sm7435)
           cd $GITHUB_WORKSPACE/sm7435
 
-          # [ΚΡΙΣΙΜΗ ΔΙΟΡΘΩΣΗ]: Αφαίρεση παλιών symlinks/placeholders
+          # Αφαίρεση παλιών symlinks ή placeholders αν υπάρχουν
           rm -rf techpack/display techpack/audio techpack/video 2>/dev/null || true
 
-          # [HARD COPY]: Πραγματική αντιγραφή των πηγών για να τις διαβάσει το techpack/Kbuild
+          # [HARD COPY]: Πραγματική αντιγραφή με βάση το σωστό tree των modules
           cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/display-drivers ./techpack/display
           cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/audio-kernel ./techpack/audio
-          cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/video-kernel ./techpack/video
+          cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/video-driver ./techpack/video
 
           echo '#!/bin/bash' > ld-wrapper
           echo 'ld.lld "$@" --lto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --lto-partitions=2' >> ld-wrapper
@@ -363,10 +363,10 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
 
-          # 1. Ευθυγράμμιση του .config με ενεργοποιημένο το TECHPACK=y
+          # 1. Ευθυγράμμιση του .config με το flag TECHPACK=y
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y olddefconfig
 
-          # 2. Μεταγλώττιση του Image (Μονολιθικό build) με inline static injection
+          # 2. Μεταγλώττιση του Image (Μονολιθικό build)
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y Image
 
       - name: 📦 Save New CCache
