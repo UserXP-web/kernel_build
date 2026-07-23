@@ -368,7 +368,7 @@ jobs:
           sed -i '/CONFIG_DRM_MSM/d' $GITHUB_WORKSPACE/kout/.config; echo "CONFIG_DRM_MSM=y" >> $GITHUB_WORKSPACE/kout/.config
           sed -i '/CONFIG_SND_SOC_QCOM/d' $GITHUB_WORKSPACE/kout/.config; echo "CONFIG_SND_SOC_QCOM=y" >> $GITHUB_WORKSPACE/kout/.config
           sed -i '/CONFIG_VIDEO_QCOM_VENUS/d' $GITHUB_WORKSPACE/kout/.config; echo "CONFIG_VIDEO_QCOM_VENUS=y" >> $GITHUB_WORKSPACE/kout/.config
-          sed -i '/CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE/d' $GITHUB_WORKSPACE/kout/.config; echo "CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE=y" >> $GITHUB_WORKSPACE/kout/.config
+          #sed -i '/CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE/d' $GITHUB_WORKSPACE/kout/.config; echo "CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE=y" >> $GITHUB_WORKSPACE/kout/.config
 
           # 1. Configuration Check με όλες τις Qualcomm Multimedia διαδρομές
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y DISPLAY_ROOT=techpack/display VIDEO_ROOT=techpack/video AUDIO_ROOT=techpack/audio olddefconfig
