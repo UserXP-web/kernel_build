@@ -342,10 +342,10 @@ jobs:
           # Μπαίνουμε στη ρίζα του πυρήνα (sm7435)
           cd $GITHUB_WORKSPACE/sm7435
 
-          # Αφαίρεση παλιών symlinks ή placeholders αν υπάρχουν
+          # Αφαίρεση παλιών symlinks ή placeholders
           rm -rf techpack/display techpack/audio techpack/video 2>/dev/null || true
 
-          # [HARD COPY]: Πραγματική αντιγραφή με βάση το σωστό tree των modules
+          # [HARD COPY]: Πραγματική αντιγραφή των πηγών για inline static injection
           cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/display-drivers ./techpack/display
           cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/audio-kernel ./techpack/audio
           cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/video-driver ./techpack/video
@@ -363,15 +363,21 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
 
+          if [ -f "$GITHUB_WORKSPACE/kout/.config" ]; then echo "<> I found GITHUB_WORKSPACE/kout/.config"; else echo "<> NOT found GITHUB_WORKSPACE/kout/.config"; fi
+
+
+          # [ΑΝΤΙΓΡΑΦΟ ΑΣΦΑΛΕΙΑΣ]: Κρατάμε το κατεβασμένο config ζωντανό πριν το make
+          cp $GITHUB_WORKSPACE/kout/.config $GITHUB_WORKSPACE/kout/fleurx_original_config
+
           # 1. Configuration Check
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y VIDEO_ROOT=techpack/video olddefconfig
 
-      - name: 📤 Upload .config for Verification
+      - name: 📤 Upload Build Folder for Verification
         uses: actions/upload-artifact@v4
         with:
           name: generated-kernel-config
-          path: ${{ github.workspace }}/kout/.config
-          
+          path: ${{ github.workspace }}/kout/
+
           ## 2. Compile Monolithic Image
           #make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y VIDEO_ROOT=techpack/video Image
 
