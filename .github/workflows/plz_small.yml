@@ -361,18 +361,14 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
 
-          # [DYNAMIC CONFIG PATCH]: Run 132 - Ενεργοποίηση της οθόνης + Βίαιη μείωση μεγέθους μέσω Optimize for Size (-Os)
-          echo "Injecting Display flags & Enforcing Size Optimization..."          
+          # [DYNAMIC CONFIG PATCH]: Μόνο η Οθόνη inline με default Performance settings
+          echo "Injecting Qualcomm Display core flags..."          
           sed -i '/CONFIG_DRM_MSM/d' $GITHUB_WORKSPACE/kout/.config; echo "CONFIG_DRM_MSM=y" >> $GITHUB_WORKSPACE/kout/.config
-          
-          # [OPTIMIZATION CHANGE]: Αλλαγή από Performance σε Size για να πέσει το Image κάτω από τα 43.0MB
-          sed -i '/CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE/d' $GITHUB_WORKSPACE/kout/.config; echo "# CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE is not set" >> $GITHUB_WORKSPACE/kout/.config
-          sed -i '/CONFIG_CC_OPTIMIZE_FOR_SIZE/d' $GITHUB_WORKSPACE/kout/.config; echo "CONFIG_CC_OPTIMIZE_FOR_SIZE=y" >> $GITHUB_WORKSPACE/kout/.config
 
           # 1. Configuration Check
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y DISPLAY_ROOT=techpack/display VIDEO_ROOT=techpack/video AUDIO_ROOT=techpack/audio olddefconfig
 
-          # 2. Compile Monolithic Image
+          # 2. Compile Monolithic Image με τον Google Clang r563880c
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y DISPLAY_ROOT=techpack/display VIDEO_ROOT=techpack/video AUDIO_ROOT=techpack/audio Image
 
       - name: 📦 Save New CCache
