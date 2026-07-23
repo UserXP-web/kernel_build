@@ -94,7 +94,7 @@ jobs:
           path: kernel_workspace/build-tools
           key: codelinaro-build-tools-ks-kernel-lnx-4.0
 
-      - name: 📥 Install Dependencies & Sync Neutron Clang Toolchain
+      - name: 📥 Install Dependencies, build-tools & Sync Neutron Clang Toolchain
         run: |
           rm -rf kernel_workspace/out 2>/dev/null || true
           mkdir -p kernel_workspace/build-tools
@@ -137,13 +137,9 @@ jobs:
           done
           echo "Source initialized successfully!"
       
-      - name: 📥 Install dependencies (old)
+      - name: 📥 OLD Install clang/dependencies
         if: false
         run: |
-          # Καθαρισμός φακέλων εργασίας πριν ξεκινήσει το κατέβασμα
-          rm -rf sm7435 kernel_workspace/out 2>/dev/null || true
-          mkdir -p kernel_workspace/clang-${{ env.CLANG_VERSION }} kernel_workspace/build-tools
-
           sudo apt-get install -y --no-install-recommends -o Dpkg::Use-Pty=0 \
             libelf-dev dos2unix pahole cmake bc &
 
@@ -159,15 +155,6 @@ jobs:
             rm -f /tmp/clang-${{ env.CLANG_VERSION }}.tar.gz
           else
             echo "Clang restored from cache, skipping download."
-          fi &
-
-          # Κατέβασμα Build Tools στο παρασκήνιο (Background)
-          if [ "${{ steps.buildtools-cache.outputs.cache-hit }}" != "true" ]; then
-            echo "Cache miss — cloning build-tools..."
-            git clone --depth=1 -b ks-kernel.lnx.4.0.r1-rel \
-               "${{ env.BUILD_TOOLS_LINK }}" kernel_workspace/build-tools
-          else
-            echo "build-tools restored from cache, skipping clone."
           fi &
 
           # Αναμονή για να ολοκληρωθούν ΟΛΑ τα παραπάνω background tasks
@@ -343,7 +330,7 @@ jobs:
             sed -i 's/const char \*name;/const char \*name = NULL;/g' "$HAPTICS_FILE"
           fi
 
-      - name: 🔨 Build Kernel (The Pure FleurX Way)
+      - name: 🔨 Build Kernel (The Target Qualcomm Module Build)
         run: |
           WORKDIR="$(pwd)"
           export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
@@ -367,62 +354,17 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
 
-          # 1. Ευθυγράμμιση
+          # [Ο ΜΟΝΑΔΙΚΟΣ ΕΡΓΟΣΤΑΣΙΑΚΟΣ ΔΙΑΚΟΠΤΗΣ]
+          # Αναγκάζει το out-of-tree Makefile να χτίσει τους Display Drivers της Xiaomi ως modules
+          export CONFIG_DISPLAY_BUILD=m
+
+          # 1. Ευθυγράμμιση του .config
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- olddefconfig
 
-          # 2. Compile Πυρήνα
+          # 2. Μεταγλώττιση του πυρήνα (Image)
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- Image
 
-          # 3. Compile Modules
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- modules
-
-          echo "Kernel Compilation Complete!"
-
-      - name: 🔨 Build Kernel (Try 1.311 Environment Fix)
-        if: false
-        run: |
-          WORKDIR="$(pwd)"
-          export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
-          export PATH="$GITHUB_WORKSPACE/kernel_workspace/neutron-clang/bin:$GITHUB_WORKSPACE/kernel_workspace/build-tools/linux-x86/bin:$PATH"
-          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
-          export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
-          export CCACHE_IS_KERNEL_COMPILING=true
-
-          cd $GITHUB_WORKSPACE/sm7435
-
-          echo '#!/bin/bash' > ld-wrapper
-          echo 'ld.lld "$@" --lto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --lto-partitions=2' >> ld-wrapper
-          chmod +x ld-wrapper
-
-          export CC="ccache clang"
-          export LD="$(pwd)/ld-wrapper"
-          export HOSTLD="$(pwd)/ld-wrapper"
-          export AR=llvm-ar
-          export NM=llvm-nm
-          export OBJCOPY=llvm-objcopy
-          export OBJDUMP=llvm-objdump
-          export STRIP=llvm-strip
-
-          # [ΟΙ ΑΥΘΕΝΤΙΚΟΙ ΣΤΑΤΙΚΟΙ ΔΙΑΚΟΠΤΕΣ ΤΗΣ QUALCOMM]
-          # Αναγκάζουμε το display techpack να ραφτεί statically ΜΕΣΑ στο Image
-          export CONFIG_DRM_MSM=y
-          export CONFIG_DRM_MSM_SDE=y
-          export CONFIG_DRM_MSM_DSI=y
-          export CONFIG_DRM_MSM_DP=y
-          export CONFIG_DISPLAY_BUILD=y
-          export CONFIG_ARCH_PARROT=y
-          # [Η ΓΕΦΥΡΑ ΓΙΑ ΤΑ UNDEFINED SYMBOLS]
-          # Ενεργοποιούμε στατικά τα security subsystems για να κλείσει το vmlinux link
-          export CONFIG_QCOM_SCM=y
-          export CONFIG_QCOM_COMMAND_DB=y
-
-          # 1. Ευθυγράμμιση
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- olddefconfig
-
-          # 2. Μεταγλώττιση Πυρήνα
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- Image
-
-          # 3. Μεταγλώττιση Modules (Τώρα θα χτιστούν οι display drivers!)
+          # 3. Μεταγλώττιση των Modules (Τώρα θα χτιστεί και ο display driver!)
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- modules
 
       - name: 📦 Save New CCache
@@ -439,7 +381,7 @@ jobs:
           path: ${{ env.LDCACHE_DIR }}
           key: lto-cache-${{ runner.os }}-${{ github.ref_name }}-${{ github.run_id }}
 
-      - name: 🧠 ~Prepare AK3 ZIP
+      - name: 🧠 ~ Prepare AK3 ZIP
         id: prepare_zip
         run: |
           cd $GITHUB_WORKSPACE/kernel_workspace
@@ -470,7 +412,7 @@ jobs:
           AK3_NAME=AnyKernel3_AOSP_5.10_Garnet_UserXP-Gem_${{ github.run_number }}
           echo "ak3name=$AK3_NAME" >> $GITHUB_OUTPUT
 
-      - name: 📤 Upload AnyKernel3
+      - name: 📤 Zip and Upload the (ready for zip) AnyKernel3
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.prepare_zip.outputs.ak3name }}
