@@ -451,10 +451,15 @@ jobs:
           # Αντιγραφή του Kernel Image ως αρχείο Image στη ρίζα του AnyKernel3
           cp $GITHUB_WORKSPACE/kout/arch/arm64/boot/Image ./Image
           
-          # [ΤΟ ΑΠΟΛΥΤΟ ΦΙΛΤΡΟ]: Μαζεύουμε ΜΟΝΟ τους εργοστασιακούς drivers της Xiaomi
+          # [ΤΟ ΑΠΟΛΥΤΟ ΦΙΛΤΡΟ]: Μαζεύουμε ΜΟΝΟ τους εργοστασιακούς drivers της Xiaomi (Touch & Display)
           mkdir -p ./modules
           find $GITHUB_WORKSPACE/kout/drivers/video/ -name "*.ko" -exec cp {} ./modules/ \; 2>/dev/null || true
-          find $GITHUB_WORKSPACE/kout/drivers/input/touchscreen/ -name "*.ko" -exec cp {} ./modules/ \; 2>/dev/null || true
+          find $GITHUB_WORKSPACE/kout/drivers/input/touchscreen/ -name "*.ko" -exec cp {} ./modules/ \; 2>/dev/null || true          
+          # [ΠΡΟΣΘΗΚΗ]: Αρπάζουμε τον out-of-tree display driver της Qualcomm/Xiaomi
+          find $GITHUB_WORKSPACE/kout/ -name "*msm_drm*.ko" -exec cp {} ./modules/ \; 2>/dev/null || true
+          find $GITHUB_WORKSPACE/kout/ -name "*display*.ko" -exec cp {} ./modules/ \; 2>/dev/null || true
+          echo "Verifying Isolated Xiaomi Touch & Display modules:"
+          ls -la ./modules/
 
           if [[ ! -f ./Image ]]; then
             echo "Kernel Image not found, build may have failed."
