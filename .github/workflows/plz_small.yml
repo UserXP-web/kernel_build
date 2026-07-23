@@ -30,6 +30,7 @@ env:
   CLANG_LINK: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android16-qpr2-release/clang-r563880c.tar.gz"
   #CLANG_VERSION: "r584948"
   #CLANG_LINK: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/167e11df8c330bced88cdf5808f61f41d9eab330/clang-r584948.tar.gz"
+  Use_Neutron_Clang: false
   Neutron_Clang_LINK: "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman"
   BUILD_TOOLS_LINK: "https://git.codelinaro.org/clo/la/kernel/prebuilts/build-tools.git"
   FINAL_CONFIG_LINK: "https://raw.githubusercontent.com/UserXP-web/kernel_build/refs/heads/main/configs/config_from_fleurx"
@@ -94,21 +95,38 @@ jobs:
           path: kernel_workspace/build-tools
           key: codelinaro-build-tools-ks-kernel-lnx-4.0
 
-      - name: 📥 Install Dependencies, build-tools & Sync Neutron Clang Toolchain
+      - name: 📥 Install Dependencies, build-tools & Sync (Neutron?) Clang Toolchain
         run: |
           rm -rf kernel_workspace/out 2>/dev/null || true
           mkdir -p kernel_workspace/build-tools
           
           sudo apt-get install -y --no-install-recommends aria2 libelf-dev dos2unix pahole cmake bc
-          
-          # Κατέβασμα και εγκατάσταση του Neutron Clang (Clang 21 + LTO + Polly)
-          mkdir -p kernel_workspace/neutron-clang
-          cd kernel_workspace/neutron-clang
-          curl -L "${{ env.Neutron_Clang_LINK }}" -o antman
-          chmod +x antman
-          ./antman -S=latest
-          cd $GITHUB_WORKSPACE
+          #sudo apt-get install -y --no-install-recommends -o Dpkg::Use-Pty=0 libelf-dev dos2unix pahole cmake bc &
 
+          if [ "${{ env.Use_Neutron_Clang }}" == "true" ]; then
+            # Κατέβασμα και εγκατάσταση του Neutron Clang (Clang 21 + LTO + Polly)
+            mkdir -p kernel_workspace/neutron-clang
+            cd kernel_workspace/neutron-clang
+            curl -L "${{ env.Neutron_Clang_LINK }}" -o antman
+            chmod +x antman
+            ./antman -S=latest            
+          else
+            # Κατέβασμα Clang στο παρασκήνιο (Background)
+            if [ "${{ steps.clang-cache.outputs.cache-hit }}" != "true" ]; then
+              set -e # stop in 1st error            
+              echo "Cache miss — downloading clang-${{ env.CLANG_VERSION }}..."
+              mkdir -p kernel_workspace/clang-${{ env.CLANG_VERSION }}
+              aria2c -x16 -s16 -k1M -j16 --retry-wait=5 --max-tries=10 \
+                -d /tmp -o clang-${{ env.CLANG_VERSION }}.tar.gz \
+                "${{ env.CLANG_LINK }}"
+              tar -C kernel_workspace/clang-${{ env.CLANG_VERSION }} -zxf /tmp/clang-${{ env.CLANG_VERSION }}.tar.gz
+              rm -f /tmp/clang-${{ env.CLANG_VERSION }}.tar.gz
+            else
+              echo "Clang restored from cache, skipping download."
+            fi
+          fi &
+
+          cd $GITHUB_WORKSPACE
           # Κατέβασμα Build Tools στο παρασκήνιο (Background)
           if [ "${{ steps.buildtools-cache.outputs.cache-hit }}" != "true" ]; then
             echo "Cache miss — cloning build-tools..."
@@ -137,30 +155,6 @@ jobs:
           done
           echo "Source initialized successfully!"
       
-      - name: 📥 OLD Install clang/dependencies
-        if: false
-        run: |
-          sudo apt-get install -y --no-install-recommends -o Dpkg::Use-Pty=0 \
-            libelf-dev dos2unix pahole cmake bc &
-
-          # Κατέβασμα Clang στο παρασκήνιο (Background)
-          if [ "${{ steps.clang-cache.outputs.cache-hit }}" != "true" ]; then
-            set -e # stop in 1st error            
-            echo "Cache miss — downloading clang-${{ env.CLANG_VERSION }}..."
-            mkdir -p kernel_workspace/clang-${{ env.CLANG_VERSION }}
-            aria2c -x16 -s16 -k1M -j16 --retry-wait=5 --max-tries=10 \
-              -d /tmp -o clang-${{ env.CLANG_VERSION }}.tar.gz \
-              "${{ env.CLANG_LINK }}"
-            tar -C kernel_workspace/clang-${{ env.CLANG_VERSION }} -zxf /tmp/clang-${{ env.CLANG_VERSION }}.tar.gz
-            rm -f /tmp/clang-${{ env.CLANG_VERSION }}.tar.gz
-          else
-            echo "Clang restored from cache, skipping download."
-          fi &
-
-          # Αναμονή για να ολοκληρωθούν ΟΛΑ τα παραπάνω background tasks
-          wait
-          echo "Tools initialized successfully!"
-
       - name: 📺 Clone Qualcomm Hardware Modules (Flat Layout)
         run: |
           echo "Cloning sm7435-modules exactly next to the kernel core..."
@@ -334,7 +328,11 @@ jobs:
         run: |
           WORKDIR="$(pwd)"
           export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
-          export PATH="$GITHUB_WORKSPACE/kernel_workspace/neutron-clang/bin:$GITHUB_WORKSPACE/kernel_workspace/build-tools/linux-x86/bin:$PATH"
+          if [ "${{ env.Use_Neutron_Clang }}" == "true" ]; then
+            export PATH="$GITHUB_WORKSPACE/kernel_workspace/neutron-clang/bin:$GITHUB_WORKSPACE/kernel_workspace/build-tools/linux-x86/bin:$PATH"
+          else
+            export PATH="$GITHUB_WORKSPACE/kernel_workspace/clang-${{ env.CLANG_VERSION }}/bin:$GITHUB_WORKSPACE/kernel_workspace/build-tools/linux-x86/bin:$PATH"
+          fi
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
           export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
           export CCACHE_IS_KERNEL_COMPILING=true
