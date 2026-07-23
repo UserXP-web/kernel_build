@@ -330,7 +330,7 @@ jobs:
             sed -i 's/const char \*name;/const char \*name = NULL;/g' "$HAPTICS_FILE"
           fi
 
-      - name: 🔨 Build Kernel (Static Monolithic Inline - Try 128)
+      - name: 🔨 Build Kernel (Static Monolithic Inline - Try 129)
         run: |
           WORKDIR="$(pwd)"
           export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
@@ -363,20 +363,22 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
 
-          # [DYNAMIC CONFIG PATCH]: Βίαιος καθαρισμός και ενεργοποίηση των Qualcomm subsystems ΠΡΙΝ την olddefconfig
-          echo "Injecting Qualcomm Multimedia core flags & Disabling Touch..."          
+          # [DYNAMIC CONFIG PATCH]: Βίαιος καθαρισμός και ενεργοποίηση των Qualcomm subsystems
+          echo "Injecting Qualcomm Multimedia core flags..."          
           sed -i '/CONFIG_DRM_MSM/d' $GITHUB_WORKSPACE/kout/.config; echo "CONFIG_DRM_MSM=y" >> $GITHUB_WORKSPACE/kout/.config
           sed -i '/CONFIG_SND_SOC_QCOM/d' $GITHUB_WORKSPACE/kout/.config; echo "CONFIG_SND_SOC_QCOM=y" >> $GITHUB_WORKSPACE/kout/.config
           sed -i '/CONFIG_VIDEO_QCOM_VENUS/d' $GITHUB_WORKSPACE/kout/.config; echo "CONFIG_VIDEO_QCOM_VENUS=y" >> $GITHUB_WORKSPACE/kout/.config
-          
-          # [ΑΠΕΝΕΡΓΟΠΟΙΗΣΗ TOUCH]: Πλήρες κλείσιμο του Xiaomi touch driver για αποφυγή του early panic
-          sed -i '/CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE/d' $GITHUB_WORKSPACE/kout/.config; echo "# CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE is not set" >> $GITHUB_WORKSPACE/kout/.config
 
           # 1. Configuration Check
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y DISPLAY_ROOT=techpack/display VIDEO_ROOT=techpack/video AUDIO_ROOT=techpack/audio olddefconfig
 
-          # 2. Compile Monolithic Image (Άμεση εκτέλεση στο ίδιο session)
+          # 2. Μεταγλώττιση του Πυρήνα και των Device Trees (DTBs)
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y DISPLAY_ROOT=techpack/display VIDEO_ROOT=techpack/video AUDIO_ROOT=techpack/audio Image
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y DISPLAY_ROOT=techpack/display VIDEO_ROOT=techpack/video AUDIO_ROOT=techpack/audio dtbs
+
+          # [THE SECRET INJECTION]: Χειροκίνητη ένωση (cat) του Πυρήνα με τα Xiaomi Device Trees (Appended DTB)
+          echo "Appending Xiaomi DTBs into the Kernel Image..."
+          cat $GITHUB_WORKSPACE/kout/arch/arm64/boot/Image $GITHUB_WORKSPACE/kout/arch/arm64/boot/dts/qcom/*.dtb > $GITHUB_WORKSPACE/kout/arch/arm64/boot/Image-dtb
 
       - name: 📦 Save New CCache
         if: success()
@@ -402,7 +404,9 @@ jobs:
           
           cd AnyKernel3
           # Αντιγραφή του Kernel Image ως αρχείο Image στη ρίζα του AnyKernel3
-          cp $GITHUB_WORKSPACE/kout/arch/arm64/boot/Image ./Image
+          #cp $GITHUB_WORKSPACE/kout/arch/arm64/boot/Image ./Image
+          # Αντιγραφή του Image-dtb ως Image στο AnyKernel3
+          cp $GITHUB_WORKSPACE/kout/arch/arm64/boot/Image-dtb ./Image
           
           ## [ΤΟ ΑΠΟΛΥΤΟ ΦΙΛΤΡΟ]: Μαζεύουμε ΜΟΝΟ τους εργοστασιακούς drivers της Xiaomi (Touch & Display)
           #mkdir -p ./modules
