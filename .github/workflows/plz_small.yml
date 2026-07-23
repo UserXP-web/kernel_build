@@ -363,16 +363,17 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
 
-          if [ -f "$GITHUB_WORKSPACE/kout/.config" ]; then echo "<> I found GITHUB_WORKSPACE/kout/.config"; else echo "<> NOT found GITHUB_WORKSPACE/kout/.config"; fi
-
-
-          # [ΑΝΤΙΓΡΑΦΟ ΑΣΦΑΛΕΙΑΣ]: Κρατάμε το κατεβασμένο config ζωντανό πριν το make
-          cp $GITHUB_WORKSPACE/kout/.config $GITHUB_WORKSPACE/kout/fleurx_original_config
+          # [DYNAMIC CONFIG PATCH]: Βίαιος καθαρισμός και ενεργοποίηση των Qualcomm subsystems ΠΡΙΝ την olddefconfig
+          echo "Injecting Qualcomm Multimedia core flags..."          
+          sed -i '/CONFIG_DRM_MSM/d' $GITHUB_WORKSPACE/kout/.config; echo "CONFIG_DRM_MSM=y" >> $GITHUB_WORKSPACE/kout/.config
+          sed -i '/CONFIG_SND_SOC_QCOM/d' $GITHUB_WORKSPACE/kout/.config; echo "CONFIG_SND_SOC_QCOM=y" >> $GITHUB_WORKSPACE/kout/.config
+          sed -i '/CONFIG_VIDEO_QCOM_VENUS/d' $GITHUB_WORKSPACE/kout/.config; echo "CONFIG_VIDEO_QCOM_VENUS=y" >> $GITHUB_WORKSPACE/kout/.config
+          sed -i '/CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE/d' $GITHUB_WORKSPACE/kout/.config; echo "CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE=y" >> $GITHUB_WORKSPACE/kout/.config
 
           # 1. Configuration Check
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y VIDEO_ROOT=techpack/video olddefconfig
 
-          # [ΤΟ ΚΟΛΠΟ]: Αντιγραφή του κρυφού .config σε φανερό αρχείο για να το πάρει το Artifact
+          # [TO ΚΟΛΠΟ]: Αντιγραφή του κρυφού .config σε φανερό αρχείο για να το πάρει το Artifact
           cp $GITHUB_WORKSPACE/kout/.config $GITHUB_WORKSPACE/kout/fleurx_OUTPUT_config.txt
 
       - name: 📤 Upload Build Folder for Verification
@@ -381,8 +382,30 @@ jobs:
           name: generated-kernel-config
           path: ${{ github.workspace }}/kout/
 
-          ## 2. Compile Monolithic Image
-          #make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y VIDEO_ROOT=techpack/video Image
+      - name: 🔨 Build Kernel 2nd part (Static Monolithic Inline)
+        run: |
+          WORKDIR="$(pwd)"
+          export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
+          export PATH="$GITHUB_WORKSPACE/kernel_workspace/neutron-clang/bin:$GITHUB_WORKSPACE/kernel_workspace/build-tools/linux-x86/bin:$PATH"
+          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
+          export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
+          export CCACHE_IS_KERNEL_COMPILING=true
+
+          # Ξαναμπαίνουμε στη ρίζα του πυρήνα (sm7435) λόγω νέου session
+          cd $GITHUB_WORKSPACE/sm7435
+
+          # Επανεξαγωγή των compilers για το νέο shell
+          export CC="ccache clang"
+          export LD="$(pwd)/ld-wrapper"
+          export HOSTLD="$(pwd)/ld-wrapper"
+          export AR=llvm-ar
+          export NM=llvm-nm
+          export OBJCOPY=llvm-objcopy
+          export OBJDUMP=llvm-objdump
+          export STRIP=llvm-strip
+
+          # 2. Compile Monolithic Image
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y VIDEO_ROOT=techpack/video Image
 
       - name: 📦 Save New CCache
         if: success()
