@@ -324,52 +324,54 @@ jobs:
             sed -i 's/const char \*name;/const char \*name = NULL;/g' "$HAPTICS_FILE"
           fi
 
-      - name: 🔨 Build Kernel (Static Monolithic Inline - Try 129)
+      - name: 🔨 Build Kernel (Monolithic Overwrite Inline)
         run: |
           WORKDIR="$(pwd)"
           export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
-          if [ "${{ env.Use_Neutron_Clang }}" == "true" ]; then
-            export PATH="$GITHUB_WORKSPACE/kernel_workspace/neutron-clang/bin:$GITHUB_WORKSPACE/kernel_workspace/build-tools/linux-x86/bin:$PATH"
-          else
-            export PATH="$GITHUB_WORKSPACE/kernel_workspace/clang-${{ env.CLANG_VERSION }}/bin:$GITHUB_WORKSPACE/kernel_workspace/build-tools/linux-x86/bin:$PATH"
-          fi
+          export PATH="$GITHUB_WORKSPACE/kernel_workspace/clang-${{ env.CLANG_VERSION }}/bin:$GITHUB_WORKSPACE/kernel_workspace/build-tools/linux-x86/bin:$PATH"
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
           export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
           export CCACHE_IS_KERNEL_COMPILING=true
 
-          # Μπαίνουμε στη ρίζα του πυρήνα (sm7435)
+          # 1. Μπαίνουμε στο core kernel repo
           cd $GITHUB_WORKSPACE/sm7435
+          
+          # 2. [CLEAN & OVERWRITE]: Σβήνουμε τον τυφλό native driver και βάζουμε της Xiaomi
+          echo "Injecting Xiaomi Display Module source into core DRM tree..."
+          rm -rf drivers/gpu/drm/msm/*
+          cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/display-drivers/msm/* drivers/gpu/drm/msm/
+          
+          # 3. Αντιγραφή των απαραίτητων include headers, config και rotator
+          echo "Copying vendor architecture headers & components..."
+          cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/display-drivers/include drivers/gpu/drm/msm/
+          cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/display-drivers/config drivers/gpu/drm/msm/
+          cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/display-drivers/rotator drivers/gpu/drm/
+          cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/display-drivers/hdcp drivers/gpu/drm/
 
-          # Αφαίρεση παλιών symlinks ή placeholders
-          rm -rf techpack/display techpack/audio techpack/video 2>/dev/null || true
+          # 4. [THE SECRET PATCH]: Μετατροπή του Driver από Module (obj-m) σε Στατικό Inline (obj-y)
+          echo "Converting driver target from out-of-tree module to monolithic built-in..."
+          sed -i 's/obj-m += msm_drm.o/obj-y += msm_drm.o/g' drivers/gpu/drm/msm/Kbuild
 
-          # [HARD COPY]: Πραγματική αντιγραφή των πηγών για inline static injection
-          cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/display-drivers ./techpack/display
-          cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/audio-kernel ./techpack/audio
-          cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/video-driver ./techpack/video
+          # 5. [PATH ALIGNMENT]: Διορθώνουμε τα include μονοπάτια στο Kbuild
+          echo "Aligning display header paths for inline compiler injection..."
+          sed -i 's|\$(DISPLAY_ROOT)/include|drivers/gpu/drm/msm/include|g' drivers/gpu/drm/msm/Kbuild
+          sed -i 's|\$(DISPLAY_ROOT)/config|drivers/gpu/drm/msm/config|g' drivers/gpu/drm/msm/Kbuild
+          sed -i 's|\$(DISPLAY_ROOT)|drivers/gpu/drm/msm|g' drivers/gpu/drm/msm/Kbuild
+          
+          # Διορθώνουμε τις σχετικές διαδρομές των rotator και hdcp που πήγαν ένα επίπεδο πάνω
+          sed -i 's|\.\./rotator|drivers/gpu/drm/rotator|g' drivers/gpu/drm/msm/Kbuild
+          sed -i 's|\.\./hdcp|drivers/gpu/drm/hdcp|g' drivers/gpu/drm/msm/Kbuild
 
-          echo '#!/bin/bash' > ld-wrapper
-          echo 'ld.lld "$@" --lto-cache-dir=$GITHUB_WORKSPACE/ldcache_garnet --lto-partitions=2' >> ld-wrapper
-          chmod +x ld-wrapper
+          # 6. Εξασφάλιση των σωστών flags στο τελικό .config
+          echo "Enabling static built-in compilation flags..."
+          sed -i '/CONFIG_DRM_MSM/d' $GITHUB_WORKSPACE/kout/.config
+          echo "CONFIG_DRM_MSM=y" >> $GITHUB_WORKSPACE/kout/.config
+          echo "CONFIG_DRM_MSM_DSI=y" >> $GITHUB_WORKSPACE/kout/.config
+          echo "CONFIG_DRM_MSM_SDE=y" >> $GITHUB_WORKSPACE/kout/.config
 
-          export CC="ccache clang"
-          export LD="$(pwd)/ld-wrapper"
-          export HOSTLD="$(pwd)/ld-wrapper"
-          export AR=llvm-ar
-          export NM=llvm-nm
-          export OBJCOPY=llvm-objcopy
-          export OBJDUMP=llvm-objdump
-          export STRIP=llvm-strip
-
-          # [DYNAMIC CONFIG PATCH]: Μόνο η Οθόνη inline με default Performance settings
-          echo "Injecting Qualcomm Display core flags..."          
-          sed -i '/CONFIG_DRM_MSM/d' $GITHUB_WORKSPACE/kout/.config; echo "CONFIG_DRM_MSM=y" >> $GITHUB_WORKSPACE/kout/.config
-
-          # 1. Configuration Check
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y DISPLAY_ROOT=techpack/display VIDEO_ROOT=techpack/video AUDIO_ROOT=techpack/audio olddefconfig
-
-          # 2. Compile Monolithic Image με τον Google Clang r563880c
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- TECHPACK=y DISPLAY_ROOT=techpack/display VIDEO_ROOT=techpack/video AUDIO_ROOT=techpack/audio Image
+          # 7. Execution: Configuration Check & Final Build
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- olddefconfig
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- Image
 
       - name: 📦 Save New CCache
         if: success()
