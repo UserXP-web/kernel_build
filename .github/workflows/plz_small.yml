@@ -348,8 +348,8 @@ jobs:
           # 5. Convert to built-in target
           sed -i 's/obj-m += msm_drm.o/obj-y += msm_drm.o/g' techpack/display/msm/Kbuild
 
-          # 6. Establish core compilation link
-          echo "obj-y += ../../../techpack/display/msm/" > drivers/gpu/drm/msm/Kbuild
+          # 6. Establish core compilation link using absolute srctree path
+          echo "obj-y += \$(srctree)/techpack/display/msm/" > drivers/gpu/drm/msm/Kbuild
 
           # 7. Inject required config flags
           sed -i '/CONFIG_DRM_MSM/d' $GITHUB_WORKSPACE/kout/.config
