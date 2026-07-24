@@ -324,7 +324,7 @@ jobs:
             sed -i 's/const char \*name;/const char \*name = NULL;/g' "$HAPTICS_FILE"
           fi
 
-      - name: 🔨 Build Kernel (Monolithic Overwrite Inline)
+      - name: Build Kernel (Monolithic Overwrite Inline)
         run: |
           WORKDIR="$(pwd)"
           export MAP="-fdebug-prefix-map=${GITHUB_WORKSPACE}=. -fmacro-prefix-map=${GITHUB_WORKSPACE}=. -ffile-prefix-map=${GITHUB_WORKSPACE}=."
@@ -333,35 +333,47 @@ jobs:
           export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
           export CCACHE_IS_KERNEL_COMPILING=true
 
-          # Μπαίνουμε στο αποθετήριο του core kernel
+          # 1. Enter core repository
           cd $GITHUB_WORKSPACE/sm7435
           
-          # [NATIVE CLEANUP]: Διασφαλίζουμε ότι ο core driver είναι άθικτος
+          # 2. Reset core drivers
           git checkout HEAD -- drivers/gpu/drm/msm/
           
-          # [TECHPACK PREPARATION]: Φτιάχνουμε τον φάκελο techpack/display στη ρίζα του πυρήνα
+          # 3. Create techpack structure
           mkdir -p techpack/display
           
-          # Αντιγράφουμε ΟΛΑ τα περιεχόμενα του modules repo εκεί που τα περιμένει η γραμμή make
+          # 4. Copy module source files
           cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/display-drivers/* techpack/display/
 
-          # [THE MONOLITHIC FIX]: Το msm/Kbuild των modules έχει "obj-m += msm_drm.o" (το θέλει ως module).
-          # Εμείς το αναγκάζουμε να γίνει built-in (obj-y) για να ενσωματωθεί στατικά στο Image.
+          # 5. Convert to built-in target
           sed -i 's/obj-m += msm_drm.o/obj-y += msm_drm.o/g' techpack/display/msm/Kbuild
 
-          # [CORE LINK]: Λέμε στον native driver του πυρήνα να μην χτίσει τον εαυτό του,
-          # αλλά να τραβήξει το Kbuild και τον κώδικα της Xiaomi από το techpack statically.
+          # 6. Establish core compilation link
           echo "obj-y += ../../../techpack/display/msm/" > drivers/gpu/drm/msm/Kbuild
 
-          # [CONFIG INJECTION]: Ενεργοποιούμε τα απαραίτητα flags στο .config
+          # 7. Inject required config flags
           sed -i '/CONFIG_DRM_MSM/d' $GITHUB_WORKSPACE/kout/.config
           echo "CONFIG_DRM_MSM=y" >> $GITHUB_WORKSPACE/kout/.config
           echo "CONFIG_DRM_MSM_DSI=y" >> $GITHUB_WORKSPACE/kout/.config
           echo "CONFIG_DRM_MSM_SDE=y" >> $GITHUB_WORKSPACE/kout/.config
 
-          # 7. Execution: Configuration Check & Final Build
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- olddefconfig
-          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout CROSS_COMPILE_COMPAT=arm-linux-gnueabi- Image
+          # 8. Configuration validation
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            TECHPACK=y \
+            DISPLAY_ROOT=techpack/display \
+            VIDEO_ROOT=techpack/video \
+            AUDIO_ROOT=techpack/audio \
+            olddefconfig
+
+          # 9. Compile monolithic kernel binary
+          make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            TECHPACK=y \
+            DISPLAY_ROOT=techpack/display \
+            VIDEO_ROOT=techpack/video \
+            AUDIO_ROOT=techpack/audio \
+            Image
 
       - name: 📦 Save New CCache
         if: success()
