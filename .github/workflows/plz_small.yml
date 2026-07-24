@@ -305,25 +305,6 @@ jobs:
             exit 1
           fi
 
-      - name: 📦 Add build name & Patch Haptics Warning
-        run: |
-          cd $GITHUB_WORKSPACE/sm7435
-          
-          if [ -f "scripts/setlocalversion" ]; then
-            sed -i 's/${scm_version}//' scripts/setlocalversion
-          fi
-          
-          if [ -f "$GITHUB_WORKSPACE/kout/.config" ]; then
-            sed -i '/CONFIG_LOCALVERSION=/d' $GITHUB_WORKSPACE/kout/.config
-            echo 'CONFIG_LOCALVERSION="-FleurX-${{ github.run_number }}"' >> $GITHUB_WORKSPACE/kout/.config
-          fi
-
-          HAPTICS_FILE="drivers/input/misc/qcom-hv-haptics.c"
-          if [ -f "$HAPTICS_FILE" ]; then
-            echo "Patching uninitialized variable inside qcom-hv-haptics.c..."
-            sed -i 's/const char \*name;/const char \*name = NULL;/g' "$HAPTICS_FILE"
-          fi
-
       - name: Build Kernel (Monolithic Overwrite Inline)
         run: |
           WORKDIR="$(pwd)"
@@ -339,17 +320,17 @@ jobs:
           # 2. Reset core drivers
           git checkout HEAD -- drivers/gpu/drm/msm/
           
-          # 3. Create techpack structure
-          mkdir -p techpack/display
+          # 3. Create techpack structure INSIDE the native msm folder
+          mkdir -p drivers/gpu/drm/msm/techpack/display
           
-          # 4. Copy module source files
-          cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/display-drivers/* techpack/display/
+          # 4. Copy module source files directly inside the new sub-folder
+          cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/display-drivers/* drivers/gpu/drm/msm/techpack/display/
 
           # 5. Convert to built-in target
-          sed -i 's/obj-m += msm_drm.o/obj-y += msm_drm.o/g' techpack/display/msm/Kbuild
+          sed -i 's/obj-m += msm_drm.o/obj-y += msm_drm.o/g' drivers/gpu/drm/msm/techpack/display/msm/Kbuild
 
-          # 6. Establish core compilation link using absolute srctree path
-          echo "obj-y += \$(srctree)/techpack/display/msm/" > drivers/gpu/drm/msm/Kbuild
+          # 6. Establish core compilation link with a clean relative path
+          echo "obj-y += techpack/display/msm/" > drivers/gpu/drm/msm/Kbuild
 
           # 7. Inject required config flags
           sed -i '/CONFIG_DRM_MSM/d' $GITHUB_WORKSPACE/kout/.config
@@ -361,7 +342,7 @@ jobs:
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout \
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
             TECHPACK=y \
-            DISPLAY_ROOT=techpack/display \
+            DISPLAY_ROOT=drivers/gpu/drm/msm/techpack/display \
             VIDEO_ROOT=techpack/video \
             AUDIO_ROOT=techpack/audio \
             olddefconfig
@@ -370,7 +351,7 @@ jobs:
           make -j$(nproc --all) LLVM=1 LLVM_IAS=1 ARCH=arm64 O=$GITHUB_WORKSPACE/kout \
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
             TECHPACK=y \
-            DISPLAY_ROOT=techpack/display \
+            DISPLAY_ROOT=drivers/gpu/drm/msm/techpack/display \
             VIDEO_ROOT=techpack/video \
             AUDIO_ROOT=techpack/audio \
             Image
