@@ -336,33 +336,24 @@ jobs:
           # Μπαίνουμε στο αποθετήριο του core kernel
           cd $GITHUB_WORKSPACE/sm7435
           
-          # Κρατάμε αντίγραφο ασφαλείας του original Kconfig
-          cp drivers/gpu/drm/msm/Kconfig $GITHUB_WORKSPACE/Kconfig.bak
+          # [NATIVE CLEANUP]: Διασφαλίζουμε ότι ο core driver είναι άθικτος
+          git checkout HEAD -- drivers/gpu/drm/msm/
           
-          # Καθαρίζουμε τον φάκελο του msm driver
-          rm -rf drivers/gpu/drm/msm/*
+          # [TECHPACK PREPARATION]: Φτιάχνουμε τον φάκελο techpack/display στη ρίζα του πυρήνα
+          mkdir -p techpack/display
           
-          # Επαναφέρουμε το original Kconfig στη θέση του για να μην σκάει το olddefconfig
-          mv $GITHUB_WORKSPACE/Kconfig.bak drivers/gpu/drm/msm/Kconfig
-          
-          # Αντιγράφουμε ΟΛΟ τον κώδικα των display drivers (μαζί με msm, hdcp, rotator, include, config) 
-          # απευθείας ΜΕΣΑ στον φάκελο drivers/gpu/drm/msm/ ώστε να είναι όλα σε ένα ενιαίο σώμα
-          cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/display-drivers/* drivers/gpu/drm/msm/
-          
-          # [THE SECRET PATCH]: Μετατρέπουμε τον driver από εξωτερικό module (obj-m) σε στατικό built-in σώμα (obj-y)
-          sed -i 's/obj-m += msm_drm.o/obj-y += msm_drm.o/g' drivers/gpu/drm/msm/Kbuild
+          # Αντιγράφουμε ΟΛΑ τα περιεχόμενα του modules repo εκεί που τα περιμένει η γραμμή make
+          cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/display-drivers/* techpack/display/
 
-          # [INCLUDE PATHS]: Ευθυγραμμίζουμε τις διαδρομές των headers για να διαβάζονται τοπικά από τον φάκελο msm
-          sed -i 's|\$(DISPLAY_ROOT)/include|drivers/gpu/drm/msm/include|g' drivers/gpu/drm/msm/Kbuild
-          sed -i 's|\$(DISPLAY_ROOT)/config|drivers/gpu/drm/msm/config|g' drivers/gpu/drm/msm/Kbuild
-          sed -i 's|\$(DISPLAY_ROOT)|drivers/gpu/drm/msm|g' drivers/gpu/drm/msm/Kbuild
-          
-          # [RELATIVE PATHS FIX]: Επειδή πλέον οι φάκελοι hdcp και rotator είναι ΜΕΣΑ στο msm/,
-          # αφαιρούμε το '../' από το Kbuild ώστε ο compiler να τα βρει τοπικά στον ίδιο κατάλογο
-          sed -i 's|\.\./rotator|rotator|g' drivers/gpu/drm/msm/Kbuild
-          sed -i 's|\.\./hdcp|hdcp|g' drivers/gpu/drm/msm/Kbuild
+          # [THE MONOLITHIC FIX]: Το msm/Kbuild των modules έχει "obj-m += msm_drm.o" (το θέλει ως module).
+          # Εμείς το αναγκάζουμε να γίνει built-in (obj-y) για να ενσωματωθεί στατικά στο Image.
+          sed -i 's/obj-m += msm_drm.o/obj-y += msm_drm.o/g' techpack/display/msm/Kbuild
 
-          # [CONFIG INJECTION]: Ενεργοποιούμε τα απαραίτητα flags στατικού build στο τελικό .config
+          # [CORE LINK]: Λέμε στον native driver του πυρήνα να μην χτίσει τον εαυτό του,
+          # αλλά να τραβήξει το Kbuild και τον κώδικα της Xiaomi από το techpack statically.
+          echo "obj-y += ../../../techpack/display/msm/" > drivers/gpu/drm/msm/Kbuild
+
+          # [CONFIG INJECTION]: Ενεργοποιούμε τα απαραίτητα flags στο .config
           sed -i '/CONFIG_DRM_MSM/d' $GITHUB_WORKSPACE/kout/.config
           echo "CONFIG_DRM_MSM=y" >> $GITHUB_WORKSPACE/kout/.config
           echo "CONFIG_DRM_MSM_DSI=y" >> $GITHUB_WORKSPACE/kout/.config
