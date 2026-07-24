@@ -333,37 +333,31 @@ jobs:
           export CCACHE_LOGFILE="${{ github.workspace }}/ccache.log"
           export CCACHE_IS_KERNEL_COMPILING=true
 
-          # 1. Μπαίνουμε στο core kernel repo
           cd $GITHUB_WORKSPACE/sm7435
           
-          # 2. [CLEAN & OVERWRITE]: Σβήνουμε τον τυφλό native driver και βάζουμε της Xiaomi
-          echo "Injecting Xiaomi Display Module source into core DRM tree..."
+          # Κρατάμε αντίγραφο ασφαλείας του original Kconfig
+          cp drivers/gpu/drm/msm/Kconfig $GITHUB_WORKSPACE/Kconfig.bak
+          
+          # Σβήνουμε τα πάντα και επαναφέρουμε ΜΟΝΟ το Kconfig
           rm -rf drivers/gpu/drm/msm/*
+          mv $GITHUB_WORKSPACE/Kconfig.bak drivers/gpu/drm/msm/Kconfig
+          
+          # Αντιγράφουμε τα αρχεία της Xiaomi
           cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/display-drivers/msm/* drivers/gpu/drm/msm/
           
-          # 3. Αντιγραφή των απαραίτητων include headers, config και rotator
-          echo "Copying vendor architecture headers & components..."
           cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/display-drivers/include drivers/gpu/drm/msm/
           cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/display-drivers/config drivers/gpu/drm/msm/
           cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/display-drivers/rotator drivers/gpu/drm/
           cp -r $GITHUB_WORKSPACE/sm7435-modules/qcom/opensource/display-drivers/hdcp drivers/gpu/drm/
 
-          # 4. [THE SECRET PATCH]: Μετατροπή του Driver από Module (obj-m) σε Στατικό Inline (obj-y)
-          echo "Converting driver target from out-of-tree module to monolithic built-in..."
           sed -i 's/obj-m += msm_drm.o/obj-y += msm_drm.o/g' drivers/gpu/drm/msm/Kbuild
 
-          # 5. [PATH ALIGNMENT]: Διορθώνουμε τα include μονοπάτια στο Kbuild
-          echo "Aligning display header paths for inline compiler injection..."
           sed -i 's|\$(DISPLAY_ROOT)/include|drivers/gpu/drm/msm/include|g' drivers/gpu/drm/msm/Kbuild
           sed -i 's|\$(DISPLAY_ROOT)/config|drivers/gpu/drm/msm/config|g' drivers/gpu/drm/msm/Kbuild
           sed -i 's|\$(DISPLAY_ROOT)|drivers/gpu/drm/msm|g' drivers/gpu/drm/msm/Kbuild
-          
-          # Διορθώνουμε τις σχετικές διαδρομές των rotator και hdcp που πήγαν ένα επίπεδο πάνω
           sed -i 's|\.\./rotator|drivers/gpu/drm/rotator|g' drivers/gpu/drm/msm/Kbuild
           sed -i 's|\.\./hdcp|drivers/gpu/drm/hdcp|g' drivers/gpu/drm/msm/Kbuild
 
-          # 6. Εξασφάλιση των σωστών flags στο τελικό .config
-          echo "Enabling static built-in compilation flags..."
           sed -i '/CONFIG_DRM_MSM/d' $GITHUB_WORKSPACE/kout/.config
           echo "CONFIG_DRM_MSM=y" >> $GITHUB_WORKSPACE/kout/.config
           echo "CONFIG_DRM_MSM_DSI=y" >> $GITHUB_WORKSPACE/kout/.config
